@@ -1,3 +1,8 @@
+*.pyc
+savedmodels
+*.suo
+samples_*
+
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
