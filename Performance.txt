@@ -1,10 +1,14 @@
-MNIST (means) - Test classification error %
- - ffn:					1.3%
- - cnn:					0.5%
+Default configuration on nVidia Titan Black
 
- MNIST (binairized) - Test lower bound
- - vae1:				94
- - cvae:				92
- - draw_at_lstm2:			
- - draw_lstm1:				87
- - draw_sgru1:				87
+MNIST (means) - 	    Test error %	Sec per epoch (batch 1000)
+ - ffn:					1.3%		0.5
+ - cnn:					0.5%		30
+
+ MNIST (binarized) - 	    Test lower bound	Sec per epoch (batch 1000)
+ - vae1:				94		2
+ - cvae:				92		35
+ - draw_at_lstm2:					220
+ - draw_lstm1:				87		10
+ - draw_sgru1:				87		8
+
+*Significant deviation from these numbers can indicate problems with the obtained version of the software, data files, Theano configuration or hardware
