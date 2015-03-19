@@ -1,0 +1,21 @@
+Obtain the following files and change data_path in train.py to the desired location:
+
+MNIST
+--------------------------
+train-images.idx3-ubyte
+train-labels.idx1-ubyte
+t10k-images.idx3-ubyte
+t10k-labels.idx1-ubyte
+
+
+Binarized MNIST:
+--------------------------
+binarized_mnist-train.h5
+binarized_mnist-valid.h5
+binarized_mnist-test.h5
+
+Frey Faces:
+--------------------------
+freyfaces.pkl
+
+
