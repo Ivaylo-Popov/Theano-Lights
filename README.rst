@@ -1,9 +1,9 @@
 Theano-Lights
 =============
 
-Theano-Lights is a research platform built on top of Theano providing transparent view of the models and optimized for batch learning on GPU
+Theano-Lights is a research platform based on Theano providing implementation of several recent Deep learning models and a convenient training and test functionality. The models are not hidden behind layers of abstraction as in most deep learning platforms to enable more transparency and flexiblity during learning and research. 
 
-Implementations of the latest deep learning models:
+Included models:
  * MLP with Dropout (FFN)
  * Convolutional neural network (CNN)
  * Variational Autoencoder  (VAE)
