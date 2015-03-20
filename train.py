@@ -29,7 +29,7 @@ if __name__ == "__main__":
         #Model = draw_sgru1.Draw_sgru1 
 
         init_scale = 1.0
-        learning_rate = 0.0008
+        learning_rate = 0.0005
 
         ''' sgd(1),  rmsprop(0.001),  adam(0.0005),  adamgc(0.0005),  esgd(0.01) '''
         optimizer = adamgc
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
 #   Data
 #--------------------------------------------------------------------------------------------------
-    data_path = 'C:\\AI\Input\\VisualRecognition\\'
+    data_path = 'data/'
 
     data = mnist(path=data_path, nvalidation=0) 
     #data = mnistBinarized(path=data_path)  # only for UL models

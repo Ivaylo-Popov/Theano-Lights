@@ -1,7 +1,8 @@
 *.pyc
+data
 savedmodels
 *.suo
-samples_*
+samples*
 
 # Windows image file caches
 Thumbs.db

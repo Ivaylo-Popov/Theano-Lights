@@ -1,7 +1,6 @@
 import os
 import cPickle as pickle
 from PIL import Image
-import matplotlib.pyplot as plt
 from subprocess import Popen
 import numpy as np
 import os
@@ -236,9 +235,9 @@ def freyfaces(path='', distort=False,shuffle=False,ntrain=60000,ntest=10000,oneh
     return data
 
 def mnistBinarized(path=''):
-    train_x = h5py.File(path+"mnist/binarized_mnist-train.h5")['data'][:]
-    valid_x = h5py.File(path+"mnist/binarized_mnist-valid.h5")['data'][:]
-    test_x = h5py.File(path+"mnist/binarized_mnist-test.h5")['data'][:]
+    train_x = h5py.File(path+"binarized_mnist-train.h5")['data'][:]
+    valid_x = h5py.File(path+"binarized_mnist-valid.h5")['data'][:]
+    test_x = h5py.File(path+"binarized_mnist-test.h5")['data'][:]
 
     data = {}
     data['P'] = len(train_x)
@@ -253,7 +252,7 @@ def mnistBinarized(path=''):
     return data
 
 def mnist2(path=''):
-    filepath = os.path.join(path,'mnist/mnist.pkl.gz')
+    filepath = os.path.join(path,'mnist.pkl.gz')
     f = gzip.open(filepath, 'rb')
     (trX,trY),(vaX,vaY),(teX,teY) = cPickle.load(f)
     f.close()
@@ -265,30 +264,29 @@ def mnist2(path=''):
     return len(trX), len(vaX), len(teX), trX.astype('float32'),vaX.astype('float32'),teX.astype('float32'),trY.astype('float32'),vaY.astype('float32'),teY.astype('float32')
 
 def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
-	data_dir = os.path.join(path,'mnist/')
 	if distort!=0:
 		ninst = 60000*(1 + distort)
 		ntrain = ninst
-		fd = open(os.path.join(data_dir,'train-images.idx3-ubyte_distorted'))
+		fd = open(os.path.join(path,'train-images.idx3-ubyte_distorted'))
 	else:
 		ninst = 60000
-		fd = open(os.path.join(data_dir,'train-images.idx3-ubyte'))
+		fd = open(os.path.join(path,'train-images.idx3-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	trX = loaded[16:ninst*784+16].reshape((ninst,28*28)).astype(float)
 
 	if distort!=0:
-		fd = open(os.path.join(data_dir,'train-labels.idx1-ubyte_distorted'))
+		fd = open(os.path.join(path,'train-labels.idx1-ubyte_distorted'))
 	else:
-		fd = open(os.path.join(data_dir,'train-labels.idx1-ubyte'))
+		fd = open(os.path.join(path,'train-labels.idx1-ubyte'))
 	
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	trY = loaded[8:ninst+8].reshape((ninst))
 
-	fd = open(os.path.join(data_dir,'t10k-images.idx3-ubyte'))
+	fd = open(os.path.join(path,'t10k-images.idx3-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teX = loaded[16:].reshape((10000,28*28)).astype(float)
 
-	fd = open(os.path.join(data_dir,'t10k-labels.idx1-ubyte'))
+	fd = open(os.path.join(path,'t10k-labels.idx1-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teY = loaded[8:].reshape((10000))
 

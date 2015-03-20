@@ -31,8 +31,6 @@ class ModelSLBase(object):
             if key in self.data:
                 self.data[key] = shared(self.data[key], borrow=True)
         
-        self.theano_mode = theano.compile.get_default_mode().including('conv_fft')
-        
         if hp['debug']:
             theano.config.optimizer = 'None'
             theano.config.compute_test_value = 'ignore'
@@ -64,15 +62,15 @@ class ModelSLBase(object):
                                                                   (batch_idx+1) * self.hp.batch_size],
                                          self.Y:self.data['tr_Y'][batch_idx * self.hp.batch_size : 
                                                                   (batch_idx+1) * self.hp.batch_size]},
-                                     outputs=[y_x], updates=updates, mode=self.theano_mode)
+                                     outputs=[y_x], updates=updates)
         
         self.validate = theano.function(inputs=[], 
                                         givens={self.X:self.data['va_X']},
-                                    outputs=[y_x], mode=self.theano_mode)
+                                    outputs=[y_x])
         
         self.test = theano.function(inputs=[], 
                                     givens={self.X:self.data['te_X']},
-                                    outputs=[y_x], mode=self.theano_mode)
+                                    outputs=[y_x])
 
         
 # --------------------------------------------------------------------------------------------------
@@ -95,8 +93,6 @@ class ModelULBase(object):
             if key in self.data:
                 self.data[key] = shared(self.data[key], borrow=True)
 
-        self.theano_mode = theano.compile.get_default_mode().including('conv_fft')
-        
         if hp['debug']:
             theano.config.optimizer = 'None'
             theano.config.compute_test_value = 'ignore'
@@ -119,20 +115,20 @@ class ModelULBase(object):
         self.train = theano.function(inputs=[batch_idx], 
                                      givens={self.X:self.data['tr_X'][batch_idx * self.hp.batch_size : 
                                                                       (batch_idx+1) * self.hp.batch_size]},
-                                     outputs=[log_pxz, log_qpz], updates=updates, mode=self.theano_mode)
+                                     outputs=[log_pxz, log_qpz], updates=updates)
         
         self.validate = theano.function(inputs=[], 
                                         givens={self.X:self.data['va_X']},
-                                        outputs=[log_pxz, log_qpz], mode=self.theano_mode)
+                                        outputs=[log_pxz, log_qpz])
         
         self.test = theano.function(inputs=[], 
                                     givens={self.X:self.data['te_X']},
-                                    outputs=[log_pxz, log_qpz], mode=self.theano_mode)
+                                    outputs=[log_pxz, log_qpz])
 
         self.testBatch = theano.function(inputs=[batch_idx], 
                                          givens={self.X:self.data['te_X'][batch_idx * self.hp.test_batch_size : 
                                                                           (batch_idx+1) * self.hp.test_batch_size]}, 
-                                         outputs=[log_pxz, log_qpz], mode=self.theano_mode)
+                                         outputs=[log_pxz, log_qpz])
         
         n_samples = T.iscalar()
 
@@ -143,5 +139,5 @@ class ModelULBase(object):
 
         self.decode = theano.function(inputs=[n_samples], 
                                       givens={self.Z:self.data['ge_Z'][:n_samples]}, 
-                                      outputs=a_pxz, mode=self.theano_mode)
+                                      outputs=a_pxz)
 
