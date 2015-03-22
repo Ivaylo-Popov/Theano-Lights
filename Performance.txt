@@ -7,7 +7,7 @@ MNIST (means) - 	    Test error %	Sec/epoch (batch 1000)
  MNIST (binarized) - 	    Test lower bound	Sec/epoch (batch 1000)
  - vae1:				94		2
  - cvae:				92		25
- - draw_at_lstm2:			85		66 (batch 200)
+ - draw_at_lstm2:			85		66 (batch 200, recurrent iterations 12)
  - draw_lstm1:				87		10
  - draw_sgru1:				87		8
 
