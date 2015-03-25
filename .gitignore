@@ -3,6 +3,7 @@ data
 savedmodels
 *.suo
 samples*
+archives
 
 # Windows image file caches
 Thumbs.db
