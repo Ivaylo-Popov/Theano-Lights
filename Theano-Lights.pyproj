@@ -23,6 +23,7 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="models\draw_at_lstm1.py" />
     <Compile Include="train.py" />
     <Compile Include="models\draw_at_lstm2.py" />
     <Compile Include="models\vae1.py" />

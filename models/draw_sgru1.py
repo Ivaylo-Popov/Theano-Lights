@@ -23,12 +23,12 @@ class Draw_sgru1(ModelULBase):
         
         n_x = self.data['n_x']
         n_h = 256
-        n_t = 12
+        n_t = 64
         n_zpt = 32
         gates = 2
         self.n_t = n_t
         self.n_z = n_t * n_zpt
-        self.sample_steps = True
+        self.sample_steps = False
 
         self.params = Parameters()
         
@@ -84,7 +84,7 @@ class Draw_sgru1(ModelULBase):
 
         for t in xrange(0, n_t):
             x_e = x - T.nnet.sigmoid(ex)
-            h_x = T.concatenate([x_e, h_decoder_h], axis=1)
+            h_x = concatenate([x_e, h_decoder_h], axis=1)
             h_encoder_h = frnn(h_x, h_encoder_h, p.W1, p.W11, p.b1, t)
             mu_encoder_t = T.dot(h_encoder_h, p.W2) + p.b2
             log_sigma_encoder_t = 0.5*(T.dot(h_encoder_h, p.W3) + p.b3) 
