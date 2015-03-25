@@ -23,7 +23,7 @@ class Draw_lstm1(ModelULBase):
         
         self.sample_steps = True
         self.n_h = 256
-        self.n_t = 8
+        self.n_t = 16
         self.n_zpt = 32
         self.n_z = self.n_t * self.n_zpt
         self.gates = 4
@@ -72,29 +72,31 @@ class Draw_lstm1(ModelULBase):
         # Encoder
         p = self.params
 
-        x = binomial(self.X)
-        x_e = T.zeros(x.shape)
+        x = self.X # binomial(self.X)
+        input_size = x.shape[0]
+
         c = p.c0
         h_encoder_h = p.b10_h
         h_encoder_c = p.b10_c
-        h_decoder_h = T.zeros((x.shape[0],p.b40_h.shape[0])) + p.b40_h  
+        h_decoder_h = T.zeros((input_size,p.b40_h.shape[0])) + p.b40_h  
         h_decoder_c = p.b40_c
         log_qpz = 0
 
+        eps = srnd.normal((n_t, input_size, n_zpt), dtype=theano.config.floatX) 
+
         for t in xrange(0, n_t):
-            h_x = T.concatenate([x, x_e, h_decoder_h], axis=1)
+            x_e = x - T.nnet.sigmoid(c)
+            h_x = concatenate([x, x_e, h_decoder_h], axis=1)
             h_encoder_h, h_encoder_c = lstm(h_x, h_encoder_h, h_encoder_c, p.W1, p.W11, p.b1)
             mu_encoder = T.dot(h_encoder_h, p.W2) + p.b2
             log_sigma_encoder = 0.5*(T.dot(h_encoder_h, p.W3) + p.b3) 
             log_qpz += -0.5* T.sum(1 + 2*log_sigma_encoder - mu_encoder**2 - T.exp(2*log_sigma_encoder))
-    
-            eps = srnd.normal(mu_encoder.shape, dtype=theano.config.floatX) 
-            z = mu_encoder + eps*T.exp(log_sigma_encoder)
+            
+            z = mu_encoder + eps[t]*T.exp(log_sigma_encoder)
             h_decoder_h, h_decoder_c = lstm(z, h_decoder_h, h_decoder_c, p.W4, p.W44, p.b4)
             c += T.dot(h_decoder_h, p.W5) + p.b5
-            pxz = T.nnet.sigmoid(c)
-            x_e = x - pxz
             
+        pxz = T.nnet.sigmoid(c)
         log_pxz = T.nnet.binary_crossentropy(pxz,x).sum()
         cost = log_pxz + log_qpz
 

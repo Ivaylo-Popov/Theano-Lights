@@ -18,10 +18,9 @@ from theano.tensor.signal.downsample import max_pool_2d
 from theano.tensor.shared_randomstreams import RandomStreams
 
 
+#--------------------------------------------------------------------------------------------------
 
 srnd = MRG_RandomStreams()
-
-#--------------------------------------------------------------------------------------------------
 
 def shared(X, name=None, dtype=theano.config.floatX, borrow=False, broadcastable=None):
     return theano.shared(np.asarray(X, dtype=dtype), name=name, borrow=borrow, broadcastable=broadcastable)
@@ -82,6 +81,37 @@ def shared_normal(shape, sv_adjusted=True, scale=1.0, name=None):
         return shared(np.random.randn(*shape) * scale_factor, name=name, broadcastable=(shape[0]==1,shape[1]==1))
     else:
         return shared(np.random.randn(*shape) * scale_factor, name=name)
+
+def batched_dot(A, B):
+    return (A[:,:,:,None]*B[:,None,:,:]).sum(axis=-2)
+
+def concatenate(tensor_list, axis=0):
+    if axis < 0:
+        axis += tensor_list[0].ndim
+
+    concat_size = sum(tensor.shape[axis] for tensor in tensor_list)
+
+    output_shape = ()
+    for k in range(axis):
+        output_shape += (tensor_list[0].shape[k],)
+    output_shape += (concat_size,)
+    for k in range(axis + 1, tensor_list[0].ndim):
+        output_shape += (tensor_list[0].shape[k],)
+
+    out = T.zeros(output_shape)
+    offset = 0
+    for tensor in tensor_list:
+        indices = ()
+        for k in range(axis):
+            indices += (slice(None),)
+        indices += (slice(offset, offset + tensor.shape[axis]),)
+        for k in range(axis + 1, tensor_list[0].ndim):
+            indices += (slice(None),)
+
+        out = T.set_subtensor(out[indices], tensor)
+        offset += tensor.shape[axis]
+
+    return out
 
 #--------------------------------------------------------------------------------------------------
 
@@ -545,9 +575,6 @@ def deconv_and_depool(X, w, b=None):
     return deconv(depool(X), w, b)
 
 #--------------------------------------------------------------------------------------------------
-
-def batched_dot(A, B):
-    return (A[:,:,:,None]*B[:,None,:,:]).sum(axis=-2)
 
 class AttentionDraw(object):
     def __init__(self, img_height, img_width, N):

@@ -17,13 +17,16 @@ from toolbox import *
 from modelbase import *
 
 
-class Draw_at_lstm2(ModelULBase):
+class Draw_at_lstm1(ModelULBase):
+    ''' 
+        Draw with Attention and LSTM (Scan version)
+    '''
     def __init__(self, data, hp):
-        super(Draw_at_lstm2, self).__init__(self.__class__.__name__, data, hp)
+        super(Draw_at_lstm1, self).__init__(self.__class__.__name__, data, hp)
         
         self.sample_steps = True
         self.n_h = 256
-        self.n_t = 64
+        self.n_t = 32
         self.n_zpt = 100
         self.n_z = self.n_t * self.n_zpt
         self.gates = 4
@@ -38,10 +41,10 @@ class Draw_at_lstm2(ModelULBase):
         scale = hp.init_scale
 
         # Attention
-        read_n = 2
+        read_n = 3
         self.reader = AttentionDraw(self.data['shape_x'][0], self.data['shape_x'][1], read_n)
 
-        write_n = 5
+        write_n = 3
         self.writer = AttentionDraw(self.data['shape_x'][0], self.data['shape_x'][1], write_n)
 
         if hp.load_model and os.path.isfile(self.filename):
@@ -54,7 +57,7 @@ class Draw_at_lstm2(ModelULBase):
                 baw_l = shared_zeros((self.writer.n_att_params,))
                 baw_w = shared_zeros((self.writer.N**2,))
 
-                W1 = shared_normal((self.reader.N**2 + n_h, n_h*gates), scale=scale)
+                W1 = shared_normal((self.reader.N**2 * 2 + n_h, n_h*gates), scale=scale)
                 W11 = shared_normal((n_h, n_h*gates), scale=scale)
                 W4 = shared_normal((n_zpt, n_h*gates), scale=scale)
                 W44 = shared_normal((n_h, n_h*gates), scale=scale)
@@ -82,8 +85,9 @@ class Draw_at_lstm2(ModelULBase):
 
         def attreader(x, x_e, h_decoder, t, p):
             l = T.dot(h_decoder, p.AR)
+            rx   = self.reader.read(x, l)
             rx_e   = self.reader.read(x_e, l)
-            return concatenate([rx_e, h_decoder], axis=1)
+            return concatenate([rx, rx_e, h_decoder], axis=1)
 
         def attwriter(h_decoder, t, p):
             w = T.dot(h_decoder, p.AW_w) + p.baw_w
@@ -95,17 +99,20 @@ class Draw_at_lstm2(ModelULBase):
         p = self.params
         frnn = lstm
 
-        x = binomial(self.X)
+        #x = binomial(self.X)
+        x = self.X
         input_size = x.shape[0]
 
-        ex, log_qpz, h_encoder, h_decoder, c_encoder, c_decoder = [T.zeros((input_size, p.ex0.shape[0])) + p.ex0, 
+        outputs_info = [T.zeros((input_size, p.ex0.shape[0])) + p.ex0, 
                         0.0,
                         T.zeros((input_size, p.b10_h.shape[0])) + p.b10_h, 
                         T.zeros((input_size, p.b40_h.shape[0])) + p.b40_h,
                         T.zeros((input_size, p.b10_c.shape[0])) + p.b10_c, 
                         T.zeros((input_size, p.b40_c.shape[0])) + p.b40_c]
 
-        for t in xrange(0, n_t):
+        eps = srnd.normal((n_t, input_size, n_zpt), dtype=theano.config.floatX) 
+
+        def stepFull(t, ex, log_qpz, h_encoder, h_decoder, c_encoder, c_decoder, x, eps): 
             x_e = x - T.nnet.sigmoid(ex)  
             r_x = attreader(x, x_e, h_decoder, t, p)
             h_encoder, c_encoder = frnn(r_x, h_encoder, c_encoder, p.W1, p.W11, p.b1, t)
@@ -113,13 +120,19 @@ class Draw_at_lstm2(ModelULBase):
             mu_encoder_t = T.dot(h_encoder, p.W2) + p.b2
             log_sigma_encoder_t = 0.5*(T.dot(h_encoder, p.W3) + p.b3) 
             log_qpz += -0.5* T.sum(1 + 2*log_sigma_encoder_t - mu_encoder_t**2 - T.exp(2*log_sigma_encoder_t))
-            eps = srnd.normal((input_size, n_zpt), dtype=theano.config.floatX) 
-            z = mu_encoder_t + eps*T.exp(log_sigma_encoder_t)
+            
+            z = mu_encoder_t + eps[t]*T.exp(log_sigma_encoder_t)
             
             h_decoder, c_decoder = frnn(z, h_decoder, c_decoder, p.W4, p.W44, p.b4, t)
             ex += attwriter(h_decoder, t, p)
 
+            return ex, log_qpz, h_encoder, h_decoder, c_encoder, c_decoder
+
+        [lex, llog_qpz, _, _, _, _], _ = theano.scan(stepFull, n_steps=n_t, sequences=[T.arange(n_t)], non_sequences=[x, eps], outputs_info=outputs_info)
+        ex = lex[-1]
+        log_qpz = llog_qpz[-1]
         pxz = T.nnet.sigmoid(ex)
+
         log_pxz = T.nnet.binary_crossentropy(pxz, x).sum()
         cost = log_pxz + log_qpz
     
@@ -127,22 +140,24 @@ class Draw_at_lstm2(ModelULBase):
         z = self.Z.reshape((-1, n_t, n_zpt), ndim=3)
         input_size = z.shape[0]
         
-        s_ex, s_h_decoder_h, s_h_decoder_c = [T.zeros((input_size, p.ex0.shape[0])) + p.ex0, 
+        outputs_info = [T.zeros((input_size, p.ex0.shape[0])) + p.ex0, 
                         T.zeros((input_size, p.b40_h.shape[0])) + p.b40_h,
                         T.zeros((input_size, p.b40_c.shape[0])) + p.b40_c]
 
-        if self.sample_steps:
-            a_pxz = T.zeros((n_t + 1, input_size, n_x))
-        else:
-            a_pxz = T.zeros((1, input_size, n_x))
-        
-        for t in xrange(0, n_t):
+        def stepGenerate(t, s_ex, s_h_decoder_h, s_h_decoder_c): 
             s_h_decoder_h, s_h_decoder_c = frnn(z[:,t,:], s_h_decoder_h, s_h_decoder_c, p.W4, p.W44, p.b4, t)
             s_ex += attwriter(s_h_decoder_h, t, p)
+            return s_ex, s_h_decoder_h, s_h_decoder_c
 
-            if self.sample_steps:
-                a_pxz = T.set_subtensor(a_pxz[t,:,:], T.nnet.sigmoid(s_ex))
+        [s_ex, _, _], _ = theano.scan(stepGenerate, n_steps=n_t, sequences=[T.arange(n_t)], outputs_info=outputs_info)
+           
+        if self.sample_steps:
+            a_pxz = T.zeros((n_t + 1, input_size, n_x))
+            for t in xrange(n_t):
+                a_pxz = T.set_subtensor(a_pxz[t,:,:], T.nnet.sigmoid(s_ex[t]))
+        else:
+            a_pxz = T.zeros((1, input_size, n_x))
 
-        a_pxz = T.set_subtensor(a_pxz[-1,:,:], T.nnet.sigmoid(s_ex))
+        a_pxz = T.set_subtensor(a_pxz[-1,:,:], T.nnet.sigmoid(s_ex[-1]))
 
         self.compile(log_pxz, log_qpz, cost, a_pxz)

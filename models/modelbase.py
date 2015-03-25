@@ -35,7 +35,6 @@ class ModelSLBase(object):
             theano.config.optimizer = 'None'
             theano.config.compute_test_value = 'ignore'
             theano.config.exception_verbosity = 'high'
-            
 
     def save(self):
         if not os.path.exists('savedmodels\\'):
@@ -53,10 +52,11 @@ class ModelSLBase(object):
 
     def compile(self, cost, y_x):
         batch_idx = T.iscalar()
+        learning_rate = T.fscalar()
 
-        updates = self.hp.optimizer(cost, self.params.values(), lr=self.hp.learning_rate)
+        updates = self.hp.optimizer(cost, self.params.values(), lr=learning_rate)
 
-        self.train = theano.function(inputs=[batch_idx],
+        self.train = theano.function(inputs=[batch_idx, learning_rate],
                                      givens={
                                          self.X:self.data['tr_X'][batch_idx * self.hp.batch_size : 
                                                                   (batch_idx+1) * self.hp.batch_size],
@@ -71,7 +71,6 @@ class ModelSLBase(object):
         self.test = theano.function(inputs=[], 
                                     givens={self.X:self.data['te_X']},
                                     outputs=[y_x])
-
         
 # --------------------------------------------------------------------------------------------------
 
@@ -109,10 +108,11 @@ class ModelULBase(object):
 
     def compile(self, log_pxz, log_qpz, cost, a_pxz):
         batch_idx = T.iscalar()
+        learning_rate = T.fscalar()
 
-        updates = self.hp.optimizer(cost, self.params.values(), lr=self.hp.learning_rate)
+        updates = self.hp.optimizer(cost, self.params.values(), lr=learning_rate)
 
-        self.train = theano.function(inputs=[batch_idx], 
+        self.train = theano.function(inputs=[batch_idx, learning_rate], 
                                      givens={self.X:self.data['tr_X'][batch_idx * self.hp.batch_size : 
                                                                       (batch_idx+1) * self.hp.batch_size]},
                                      outputs=[log_pxz, log_qpz], updates=updates)
