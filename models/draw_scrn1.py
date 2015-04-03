@@ -17,15 +17,16 @@ from toolbox import *
 from modelbase import *
 
 
-class Draw_sgru1(ModelULBase):
+class Draw_scrn1(ModelULBase):
     def __init__(self, data, hp):
-        super(Draw_sgru1, self).__init__(self.__class__.__name__, data, hp)
+        super(Draw_scrn1, self).__init__(self.__class__.__name__, data, hp)
         
         n_x = self.data['n_x']
-        n_h = 256
+        n_h = 512
+        n_c = 128
         n_t = 12
         n_zpt = 32
-        gates = 4
+        gates = 2
         self.n_t = n_t
         self.n_z = n_t * n_zpt
         self.sample_steps = False
@@ -36,14 +37,22 @@ class Draw_sgru1(ModelULBase):
             self.params.load(self.filename)
         else:
             with self.params:
-                W1 = shared_normal((gates*1, n_x + n_h, n_h*2), scale=hp.init_scale)
-                W11 = shared_normal((gates*1, n_h, n_h*2), scale=hp.init_scale)
-                W4 = shared_normal((gates*1, n_zpt, n_h*2), scale=hp.init_scale)
-                W44 = shared_normal((gates*1, n_h, n_h*2), scale=hp.init_scale)
-                b1 = shared_zeros((gates*1, n_h*2,))
-                b4 = shared_zeros((gates*1, n_h*2,))
                 b10_h = shared_zeros((n_h,))
                 b40_h = shared_zeros((n_h,))
+
+                R1 = shared_normal((n_h-n_c, n_h-n_c), scale=hp.init_scale)
+                P1 = shared_normal((n_c, n_h-n_c), scale=hp.init_scale)
+                A1 = shared_normal((n_x + n_h, n_h-n_c), scale=hp.init_scale)
+                b1 = shared_zeros((n_h-n_c,))
+                B1 = shared_normal((n_x + n_h, n_c), scale=hp.init_scale)
+                #C1 = shared_normal((n_c,), scale=hp.init_scale)
+
+                R4 = shared_normal((n_h-n_c, n_h-n_c), scale=hp.init_scale)
+                P4 = shared_normal((n_c, n_h-n_c), scale=hp.init_scale)
+                A4 = shared_normal((n_zpt, n_h-n_c), scale=hp.init_scale)
+                b4 = shared_zeros((n_h-n_c,))
+                B4 = shared_normal((n_zpt, n_c), scale=hp.init_scale)
+                #C4 = shared_normal((n_c,), scale=hp.init_scale)
     
                 W2 = shared_normal((n_h, n_zpt), scale=hp.init_scale)
                 W3 = shared_normal((n_h, n_zpt), scale=hp.init_scale)
@@ -53,58 +62,33 @@ class Draw_sgru1(ModelULBase):
                 b5 = shared_zeros((n_x,))
                 ex0 = shared_zeros((n_x,))
         
-        def rnn(X, h, W, U, b, t):
-            return T.tanh(T.dot(X,W[0]) + T.dot(h,U[0]) + b[0])
+        def scrn(X, h, R, P, A, B, b, t):
+            #c_t = T.dot(X,B)*(1-T.nnet.sigmoid(C)) + h[:,:n_c]*T.nnet.sigmoid(C)
+            c_t = T.dot(X,B)*0.05 + h[:,:n_c]*0.95
+            h_t = T.tanh(T.dot(X,A) + T.dot(c_t,P) + T.dot(h[:,n_c:],R) + b)
+            return concatenate([c_t, h_t], axis=1)
 
-        #def gru(X, h, W, U, b):
-        #    z_t = T.nnet.sigmoid(T.dot(X,W[:,:n_h]) + T.dot(h,U[:,:n_h]) + b[n_h])
-        #    r_t = T.nnet.sigmoid(T.dot(X,W[:,n_h:2*n_h]) + T.dot(h,U[:,n_h:2*n_h]) + b[n_h:2*n_h])
-        #    h_t = T.tanh(T.dot(X,W[:,2*n_h:3*n_h]) + r_t * T.dot(h,U[:,2*n_h:3*n_h]) + b[2*n_h:3*n_h])
-        #    return (1 - z_t) * h + z_t * h_t
-
-        def sgru(X, h, W, U, b, t):
-            t = 0
-            z_t = T.tanh(T.dot(X,W[t*2+0]) + T.dot(h,U[t*2+0]) + b[t*2+0])
-            r_t = T.tanh(T.dot(X,W[t*2+1]) + T.dot(h,U[t*2+1]) + b[t*2+1])
-            return z_t * r_t
-
-        def sgru2(X, h, W, U, b, t):
-            t = 0
-            z_t = T.tanh(T.dot(X,W[t*2+0]) + b[t*2+0])
-            r_t = (T.dot(h,U[t*2+0]) + b[t*2+1])
-            return T.tanh(T.dot(z_t*r_t,T.transpose(U[t*2+1]))) 
-
-        def sgru3(X, h, W, U, b, t):
-            t = 0
-            z_t = T.tanh(T.dot(X,W[t*2+0]) + b[t*2+0])
-            r_t = (T.dot(h,U[t*2+0]) + b[t*2+1])
-            z_t2 = (T.dot(X,W[t*2+1]) + b[t*2+2])
-            r_t2 = T.tanh(T.dot(h,U[t*2+1]) + b[t*2+3])
-            return T.tanh(T.dot(z_t*r_t,T.transpose(U[t*2+2])) + T.dot(z_t2*r_t2,T.transpose(U[t*2+3]))) 
-
-        frnn = sgru3
-
-        # Encoder
+        frnn = scrn
         p = self.params
-
-        x = self.X  # binomial(self.X)
+        
+        x = binomial(self.X)
         input_size = x.shape[0]
         ex = p.ex0
-        h_encoder_h = p.b10_h
+        h_encoder_h = T.zeros((input_size, p.b10_h.shape[0])) + p.b10_h
         h_decoder_h = T.zeros((input_size, p.b40_h.shape[0])) + p.b40_h
         log_qpz = 0
 
         for t in xrange(0, n_t):
             x_e = x - T.nnet.sigmoid(ex)
             h_x = concatenate([x_e, h_decoder_h], axis=1)
-            h_encoder_h = frnn(h_x, h_encoder_h, p.W1, p.W11, p.b1, t)
+            h_encoder_h = frnn(h_x, h_encoder_h, p.R1, p.P1, p.A1, p.B1, p.b1, t)
             mu_encoder_t = T.dot(h_encoder_h, p.W2) + p.b2
             log_sigma_encoder_t = 0.5*(T.dot(h_encoder_h, p.W3) + p.b3) 
             log_qpz += -0.5* T.sum(1 + 2*log_sigma_encoder_t - mu_encoder_t**2 - T.exp(2*log_sigma_encoder_t))
         
             eps = srnd.normal(mu_encoder_t.shape, dtype=theano.config.floatX) 
             z = mu_encoder_t + eps*T.exp(log_sigma_encoder_t)
-            h_decoder_h = frnn(z, h_decoder_h, p.W4, p.W44, p.b4, t)
+            h_decoder_h = frnn(z, h_decoder_h, p.R4, p.P4, p.A4, p.B4, p.b4, t)
             ex += T.dot(h_decoder_h, p.W5) + p.b5
             
         pxz = T.nnet.sigmoid(ex)
@@ -115,17 +99,17 @@ class Draw_sgru1(ModelULBase):
         z = self.Z.reshape((-1, n_t, n_zpt), ndim=3)
         input_size = z.shape[0]
         s_ex = p.ex0
-        s_h_decoder_h = p.b40_h
+        s_h_decoder_h = T.zeros((input_size, p.b40_h.shape[0])) + p.b40_h
         
         if self.sample_steps:
-            a_pxz = T.zeros((n_t + 1, input_size, n_x))
+            a_pxz = T.zeros((n_t + 1, z.shape[0], n_x))
         else:
-            a_pxz = T.zeros((1, input_size, n_x))
+            a_pxz = T.zeros((1, z.shape[0], n_x))
 
         for t in xrange(0, n_t):
             if self.sample_steps:
                 a_pxz = T.set_subtensor(a_pxz[t,:,:], T.nnet.sigmoid(s_ex))
-            s_h_decoder_h = frnn(z[:,t,:], s_h_decoder_h, p.W4, p.W44, p.b4, t)
+            s_h_decoder_h = frnn(z[:,t,:], s_h_decoder_h, p.R4, p.P4, p.A4, p.B4, p.b4, t)
             s_ex +=  T.dot(s_h_decoder_h, p.W5) + p.b5
             
         a_pxz = T.set_subtensor(a_pxz[-1,:,:], T.nnet.sigmoid(s_ex))

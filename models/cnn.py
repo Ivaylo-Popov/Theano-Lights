@@ -62,10 +62,10 @@ class CNN(ModelSLBase):
         x = T.reshape(self.X, (-1, 1, 28, 28))
 
         noise_py_x = model(x, self.params, 0.2, 0.5)
-        cost = T.mean(T.nnet.categorical_crossentropy(noise_py_x, self.Y))
+        cost = T.sum(T.nnet.categorical_crossentropy(noise_py_x, self.Y))
 
-        py_x = model(x, self.params, 0., 0.)
-        y_x = T.argmax(py_x, axis=1)
-        
-        self.compile(cost, y_x)
+        pyx = model(x, self.params, 0., 0.)
+        map_pyx = T.argmax(pyx, axis=1)
+        error_map_pyx = T.sum(T.neq(map_pyx, T.argmax(self.Y, axis=1)))
 
+        self.compile(cost, error_map_pyx)

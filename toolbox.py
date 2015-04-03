@@ -3,6 +3,7 @@ import cPickle as pickle
 from PIL import Image
 from subprocess import Popen
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 import os
 import gzip
 from random import shuffle
@@ -113,7 +114,25 @@ def concatenate(tensor_list, axis=0):
 
     return out
 
+def batch_col(input_size, c):
+    return T.zeros((input_size, c.shape[0])) + c
+
 #--------------------------------------------------------------------------------------------------
+
+def norm_gs(params, grads):
+    norm_gs = 0.
+    for g in grads:
+        norm_gs += (g**2).sum()
+    
+    #num_params = 0.
+    #for p in params:
+    #    prod = 1.
+    #    for d in p.shape:
+    #        prod *= d
+    #    num_params += prod
+    #norm_gs /= T.cast(num_params, dtype=theano.config.floatX)
+
+    return norm_gs
 
 def sgd(cost, params, lr=1.0, alpha=0.1):
     """SGD with Momentum (and Langevin Dynamics)"""
@@ -121,10 +140,46 @@ def sgd(cost, params, lr=1.0, alpha=0.1):
     updates = []
     for p, g in zip(params, grads):
         v = shared(p.get_value() * 0.)
-        v_new = v * (1.0 - alpha) - alpha * lr * g # + srnd.normal(v.shape, std = sigma, dtype=theano.config.floatX) 
+        v_new = v * (1.0 - alpha) - alpha * lr * g
         updates.append((v, v_new))
-        updates.append([p, p + v_new])
-    return updates
+        updates.append((p, p + v_new ))  #+ T.sqrt(lr) / 600.0 * srnd.normal(v.shape, dtype=theano.config.floatX)
+    
+    return updates, norm_gs(params, grads)
+
+def sgdgc(cost, params, lr=1.0, max_magnitude=5.0, infDecay=0.1):
+    """SGD with gradient clipping"""
+    grads = T.grad(cost=cost, wrt=params)
+    updates = []
+
+    norm = norm_gs(params, grads)
+    sqrtnorm = T.sqrt(norm)
+    not_finite = T.or_(T.isnan(sqrtnorm), T.isinf(sqrtnorm))
+    adj_norm_gs = T.switch(T.ge(sqrtnorm, max_magnitude), max_magnitude / sqrtnorm, 1.)
+
+    for p, g in zip(params, grads):
+        g = T.switch(not_finite, infDecay * p, g * adj_norm_gs)
+        updates.append((p, p - lr * g))  
+    
+    return updates, norm
+
+def sgdmgc(cost, params, lr=1.0, alpha=0.3, max_magnitude=5.0, infDecay=0.1):
+    """SGD with momentum and gradient clipping"""
+    grads = T.grad(cost=cost, wrt=params)
+    updates = []
+
+    norm = norm_gs(params, grads)
+    sqrtnorm = T.sqrt(norm)
+    not_finite = T.or_(T.isnan(sqrtnorm), T.isinf(sqrtnorm))
+    adj_norm_gs = T.switch(T.ge(sqrtnorm, max_magnitude), max_magnitude / sqrtnorm, 1.)
+
+    for p, g in zip(params, grads):
+        v = shared(p.get_value() * 0.)
+        g = T.switch(not_finite, infDecay * p, g * adj_norm_gs)
+        v_new = v * (1.0 - alpha) - alpha * lr * g
+        updates.append((v, v_new))
+        updates.append((p, p + v_new ))
+    
+    return updates, norm
 
 def rmsprop(cost, params, lr=0.001, alpha=0.2, beta=0.2, epsilon=1e-6, decay_rate=0.0, data_part=0.0): 
     """RMSprop and AdaGrad"""
@@ -135,7 +190,7 @@ def rmsprop(cost, params, lr=0.001, alpha=0.2, beta=0.2, epsilon=1e-6, decay_rat
         acc_new = acc - beta * acc + alpha * g ** 2
         updates.append((acc, acc_new))
         updates.append((p, p - g / T.sqrt(acc_new + epsilon) * lr - p * decay_rate * data_part))
-    return updates
+    return updates, norm_gs(params, grads)
 
 def esgd(cost, params, lr=0.02, e=1e-2): 
     """Equilibrated SGD"""
@@ -154,7 +209,7 @@ def esgd(cost, params, lr=0.02, e=1e-2):
         acc_new = acc + gg ** 2
         updates.append((acc, acc_new))
         updates.append((p, p - g / (T.sqrt(acc_new/i_t) + e) * lr))
-    return updates
+    return updates, norm_gs(params, grads)
 
 def adam(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8):
     updates = []
@@ -177,18 +232,16 @@ def adam(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8):
         updates.append((v, v_t))
         updates.append((p, p_t))
     updates.append((i, i_t))
-    return updates
+    return updates, norm_gs(params, grads)
 
 def adamgc(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8, max_magnitude=5.0, infDecay=0.1):
     updates = []
     grads = T.grad(cost, params)
     
-    norm_gs = 0.
-    for g in grads:
-        norm_gs += (g ** 2).sum()
-    not_finite = T.or_(T.isnan(norm_gs), T.isinf(norm_gs))
-    norm_gs = T.sqrt(norm_gs)
-    norm_gs = T.switch(T.ge(norm_gs, max_magnitude), max_magnitude / norm_gs, 1.)
+    norm = norm_gs(params, grads)
+    sqrtnorm = T.sqrt(norm)
+    not_finite = T.or_(T.isnan(sqrtnorm), T.isinf(sqrtnorm))
+    adj_norm_gs = T.switch(T.ge(sqrtnorm, max_magnitude), max_magnitude / sqrtnorm, 1.)
 
     i = shared(floatX(0.))
     i_t = i + 1.
@@ -196,7 +249,7 @@ def adamgc(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8, max_magnitude=5.0, 
     fix2 = 1. - (1. - b2)**i_t
     lr_t = lr * (T.sqrt(fix2) / fix1)
     for p, g in zip(params, grads):
-        g = T.switch(not_finite, infDecay * p, g * norm_gs)
+        g = T.switch(not_finite, infDecay * p, g * adj_norm_gs)
         m = shared(p.get_value() * 0.)
         v = shared(p.get_value() * 0.)
         m_t = (b1 * g) + ((1. - b1) * m) 
@@ -207,11 +260,16 @@ def adamgc(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8, max_magnitude=5.0, 
         updates.append((v, v_t))
         updates.append((p, p_t))
     updates.append((i, i_t))
-    return updates
+    return updates, norm
 
 #--------------------------------------------------------------------------------------------------
 
-def one_hot(x,n):
+def theano_one_hot(idxs, n):
+    z = T.zeros((idxs.shape[0], n))
+    one_hot = T.set_subtensor(z[T.arange(idxs.shape[0]), idxs], 1)
+    return one_hot
+
+def one_hot(x, n):
 	if type(x) == list:
 		x = np.array(x)
 	x = x.flatten()
@@ -358,6 +416,37 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 
 	return data
 
+def penntree(path='', batch_size=100, data_mode='words', n_train=0, overlap=True):
+    # data_mode in ('words', 'chars')
+
+    def slice_batches(data_x, seq_size):
+        size = (len(data_x) / batch_size) * batch_size
+        batch_data = data_x[:size].reshape(batch_size, -1).transpose()
+        return batch_data
+
+    npz_data = np.load(path + "penntree.npz")
+    
+    data = {}
+    
+    data['tr_X'] = slice_batches(npz_data['train_' + data_mode][30:], batch_size)
+    if n_train != 0:
+        data['tr_X'] = data['tr_X'][:n_train]
+
+    data['va_X'] = slice_batches(npz_data['valid_' + data_mode], batch_size)
+    
+    data['te_X'] = slice_batches(npz_data['test_' + data_mode], batch_size)
+
+    data['P'] = len(data['tr_X'])
+    data['n_x'] = int(1)
+    data['shape_x'] = (1, batch_size)
+    data['n_tokens'] = int(npz_data['n_words']) + 1
+    
+    #npz_data = np.load(path + "penntree_dict.npz")
+    #vocabulary = dict((word.lower(), word_index) 
+    #                        for word_index, word in enumerate(npz_data['unique_' + data_mode]))
+
+    return data
+
 #--------------------------------------------------------------------------------------------------
 
 def scale_to_unit_interval(ndar, eps=1e-8):
@@ -367,7 +456,7 @@ def scale_to_unit_interval(ndar, eps=1e-8):
     ndar *= 1.0 / (ndar.max() + eps)
     return ndar
 
-def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0), scale_rows_=True, output_pixvals=True):
+def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0), scale_rows_=False, output_pixvals=True):
     """
     Transform an array with one flattened image per row, into an array in
     which images are reshaped and layed out like tiles on a floor.
@@ -459,6 +548,11 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0), scale_rows
                         tile_col * (W + Ws): tile_col * (W + Ws) + W
                         ] = this_img * c
         return out_array
+
+def visualize_tokens(it, images, shape, p=0):
+    image_data = tile_raster_images(images, img_shape=[shape[0], shape[1]], tile_shape=[len(images)/shape[0], shape[0]], tile_spacing=(0,0))
+    im_new = Image.fromarray(np.uint8(image_data))
+    im_new.save('samples_'+str(it)+'.png')
 
 def visualize(it, images, shape, p=0):
     image_data = tile_raster_images(images, img_shape=[shape[0], shape[1]], tile_shape=[np.sqrt(len(images)).astype('int32'),len(images)/np.sqrt(len(images)).astype('int32')], tile_spacing=(2,2))
@@ -625,3 +719,27 @@ class AttentionDraw(object):
         I = 1./gamma * I 
         return I
 
+
+#class BatchNormalization(Layer):
+#    '''
+#        Reference: 
+#            Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift
+#                http://arxiv.org/pdf/1502.03167v3.pdf
+#    '''
+#    def __init__(self, input_shape, epsilon=1e-6, weights=None):
+#        self.init = initializations.get("uniform")
+#        self.input_shape = input_shape
+#        self.epsilon = epsilon
+
+#        self.gamma = self.init((self.input_shape))
+#        self.beta = shared_zeros(self.input_shape)
+
+#        self.params = [self.gamma, self.beta]
+#        if weights is not None:
+#            self.set_weights(weights)
+
+#    def output(self, train):
+#        X = self.get_input(train)
+#        X_normed = (X - X.mean(keepdims=True)) / (X.std(keepdims=True) + self.epsilon)
+#        out = self.gamma * X_normed + self.beta
+#        return out

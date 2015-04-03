@@ -1,6 +1,7 @@
 import numpy as np
 import time
 from operator import add
+import numpy as np
 
 from toolbox import *
 from models import *
@@ -11,59 +12,42 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     hp = Parameters()
     with hp:
-        batch_size = 1000
-        test_batch_size = 1000
-        train_perm = False
-
+        batch_size = 256
+        test_batch_size = 256
+        
         load_model = False
         save_model = True
 
         debug = False
         resample_z = False
-
-        #Model = ffn.FFN
-        #Model = cnn.CNN
-        
-        Model = vae1.Vae1
-        #Model = cvae.Cvae 
-        #Model = draw_at_lstm1.Draw_at_lstm1 
-        #Model = draw_at_lstm2.Draw_at_lstm2 
-        #Model = draw_lstm1.Draw_lstm1 
-        #Model = draw_sgru1.Draw_sgru1 
-
-        init_scale = 1.05  
-        learning_rate = 0.0008 
-        lr_halflife = 20
-
-        ''' sgd(0.001),  rmsprop(0.001),  adam(0.0005),  adamgc(0.0005),  esgd(0.01) '''
-        optimizer = adamgc
-
-        # ------------------
+        train_perm = False
         walkforward = False
-        walkstep_size = 5
-        ws_iterations = 200
-        n_stepdecay = 1.0
-        ws_validstop = 0.02
+
+        #Model = lm_ffn.LM_ffn
+        Model = lm_lstm.LM_lstm
+
+        seq_size = 20
+        warmup_size = 0
+
+        init_scale = 1.05
+        learning_rate = 1.5
+        lr_halflife = 40
+        optimizer = sgdgc
 
 
 #   Data
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    #data = mnist(path=data_path+'mnist/', nvalidation=0) 
-    data = mnistBinarized(path=data_path+'mnist/')  # only for UL models
-
-    #data = mnist(path=data_path+'mnist/', distort=3, shuffle=True) 
-    #data = freyfaces(path=data_path+'frey/')
-
-    visualize(-1, data['tr_X'][0:min(len(data['tr_X']), 900)], data['shape_x'])
-
+    data = penntree(path=data_path+'penntree/', batch_size=batch_size, n_train=0, overlap=True)
+    visualize_tokens(-1, data['tr_X'][0:min(len(data['tr_X']), 500)]/float(data['n_tokens']), data['shape_x'])
+    
 
 #   Training
 #--------------------------------------------------------------------------------------------------
     model = Model(data, hp)
     
-    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  ws: %d  iter: %d" % (model.id, learning_rate, init_scale, batch_size, walkforward*walkstep_size, ws_iterations)) 
+    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  seq_size: %d" % (model.id, learning_rate, init_scale, batch_size, seq_size)) 
     
     if walkforward:
         # Walkforward learning
@@ -140,40 +124,31 @@ if __name__ == "__main__":
     else:
         # Full training data learning
         n_iterations = 10000
-        freq_save = 20
+        freq_save = 2
         freq_sample = 10
-        it_lr = learning_rate
+        it_lr = float(learning_rate)
+        rnd_offset = np.arange(seq_size)
+        rnd_offset = np.random.permutation(seq_size)
 
         for it in range(n_iterations):
             begin = time.time()
             model.permuteData(data)
                 
-            tr_outputs = model.train_epoch(it_lr)
-            #te_outputs = model.test_epoch()
+            tr_outputs = model.train_epoch(it_lr, rnd_offset[it % seq_size])
             te_outputs = model.validation_epoch()
+            #te_outputs = model.test_epoch()
                 
-            if model.type == 'SL':
-                # Supervised learning
-                print("%d,%.4f,%.4f,%.4f,%.4f,%.2e,%.2f" % (it, 
-                                                tr_outputs[model.outidx['cost']], te_outputs[model.outidx['cost']],
-                                                tr_outputs[model.outidx['error_map_pyx']], te_outputs[model.outidx['error_map_pyx']], 
+            if model.type == 'LM':
+                # Lanugage model
+                print("%d,%.2f,%.2f,%.2e,%.2f" % (it, 
+                                                np.exp(tr_outputs[model.outidx['cost']]), 
+                                                np.exp(te_outputs[model.outidx['cost']]),
                                                 tr_outputs[model.outidx['norm_grad']],
                                                 time.time() - begin))
-            elif model.type == 'UL':
-                # Unsupervised learning
-                print("%d,%.2f,%.2f,%.2f,%.2f,%.2e,%.2f" % (it, 
-                                                       tr_outputs[model.outidx['cost_q']], te_outputs[model.outidx['cost_q']], 
-                                                       tr_outputs[model.outidx['cost']], te_outputs[model.outidx['cost']], 
-                                                       tr_outputs[model.outidx['norm_grad']],
-                                                       time.time() - begin))
-                # Generate samples
-                if it % freq_sample == 0:
-                    y_samples = model.decode(36 * (model.n_t + 1))
-                    y_samples = np.transpose(y_samples, (1,0,2)).reshape((-1, y_samples.shape[2]))
-                    visualize(it, y_samples, data['shape_x'])
 
             # Save model parameters
             if hp.save_model and it % freq_save == 0:
                 model.save()
-
-            it_lr = float(it_lr*np.power(0.5, 1./lr_halflife))
+            
+            if lr_halflife != 0:
+                it_lr = float(it_lr*np.power(0.5, 1./lr_halflife))
