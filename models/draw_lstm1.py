@@ -23,7 +23,7 @@ class Draw_lstm1(ModelULBase):
         
         self.sample_steps = True
         self.n_h = 256
-        self.n_t = 16
+        self.n_t = 12
         self.n_zpt = 32
         self.n_z = self.n_t * self.n_zpt
         self.gates = 4
