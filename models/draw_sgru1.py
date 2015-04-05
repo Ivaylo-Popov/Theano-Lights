@@ -36,12 +36,12 @@ class Draw_sgru1(ModelULBase):
             self.params.load(self.filename)
         else:
             with self.params:
-                W1 = shared_normal((gates*1, n_x + n_h, n_h*2), scale=hp.init_scale)
-                W11 = shared_normal((gates*1, n_h, n_h*2), scale=hp.init_scale)
-                W4 = shared_normal((gates*1, n_zpt, n_h*2), scale=hp.init_scale)
-                W44 = shared_normal((gates*1, n_h, n_h*2), scale=hp.init_scale)
-                b1 = shared_zeros((gates*1, n_h*2,))
-                b4 = shared_zeros((gates*1, n_h*2,))
+                W1 = shared_normal((gates*1, n_x + n_h, n_h), scale=hp.init_scale)
+                W11 = shared_normal((gates*1, n_h, n_h), scale=hp.init_scale)
+                W4 = shared_normal((gates*1, n_zpt, n_h), scale=hp.init_scale)
+                W44 = shared_normal((gates*1, n_h, n_h), scale=hp.init_scale)
+                b1 = shared_zeros((gates*1, n_h,))
+                b4 = shared_zeros((gates*1, n_h,))
                 b10_h = shared_zeros((n_h,))
                 b40_h = shared_zeros((n_h,))
     
@@ -82,7 +82,7 @@ class Draw_sgru1(ModelULBase):
             r_t2 = T.tanh(T.dot(h,U[t*2+1]) + b[t*2+3])
             return T.tanh(T.dot(z_t*r_t,T.transpose(U[t*2+2])) + T.dot(z_t2*r_t2,T.transpose(U[t*2+3]))) 
 
-        frnn = sgru3
+        frnn = sgru
 
         # Encoder
         p = self.params

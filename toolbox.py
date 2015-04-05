@@ -430,7 +430,7 @@ def penntree(path='', batch_size=100, data_mode='words', n_train=0, overlap=True
     
     data['tr_X'] = slice_batches(npz_data['train_' + data_mode][30:], batch_size)
     if n_train != 0:
-        data['tr_X'] = data['tr_X'][:n_train]
+        data['tr_X'] = data['tr_X'][:n_train/batch_size]
 
     data['va_X'] = slice_batches(npz_data['valid_' + data_mode], batch_size)
     

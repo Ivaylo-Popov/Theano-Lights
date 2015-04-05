@@ -8,5 +8,7 @@ __all__ = [
     "draw_lstm1", 
     "draw_sgru1",
     "lm_ffn",
-    "lm_lstm"
+    "lm_lstm",
+    "lm_sgru",
+    "lm_gru"
     ]
