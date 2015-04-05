@@ -24,15 +24,18 @@ if __name__ == "__main__":
         walkforward = False
 
         #Model = lm_ffn.LM_ffn
+        #Model = lm_gru.LM_gru
         Model = lm_lstm.LM_lstm
 
         seq_size = 20
-        warmup_size = 0
+        warmup_size = 1
 
         init_scale = 1.05
         learning_rate = 1.5
         lr_halflife = 40
         optimizer = sgdgc
+
+        description = ''
 
 
 #   Data
@@ -47,7 +50,7 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     model = Model(data, hp)
     
-    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  seq_size: %d" % (model.id, learning_rate, init_scale, batch_size, seq_size)) 
+    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  seq_size: %d  desc: %s" % (model.id, learning_rate, init_scale, batch_size, seq_size, description)) 
     
     if walkforward:
         # Walkforward learning
@@ -127,7 +130,7 @@ if __name__ == "__main__":
         freq_save = 2
         freq_sample = 10
         it_lr = float(learning_rate)
-        rnd_offset = np.arange(seq_size)
+        #rnd_offset = np.arange(seq_size)
         rnd_offset = np.random.permutation(seq_size)
 
         for it in range(n_iterations):

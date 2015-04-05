@@ -25,6 +25,8 @@
   <ItemGroup>
     <Compile Include="models\draw_at_lstm1.py" />
     <Compile Include="models\draw_scrn1.py" />
+    <Compile Include="models\lm_gru.py" />
+    <Compile Include="models\lm_sgru.py" />
     <Compile Include="models\lm_lstm.py" />
     <Compile Include="models\lm_ffn.py" />
     <Compile Include="train_lm.py" />

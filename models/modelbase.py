@@ -253,9 +253,15 @@ class ModelLMBase(ModelBase):
                 data['tr_X'] = data['tr_X'][perm_idx]
                 data['tr_Y'] = data['tr_Y'][perm_idx]
 
+    def reset_hiddenstates(self):
+        for hs in self.hiddenstates.values():
+            hs = hs * 0.0
+
     def train_epoch(self, it_lr, offset=0):
         tr_outputs = None
-        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - 1 - self.hp.warmup_size) * (self.data['len_tr_X'] - offset) / self.hp.seq_size
+        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * (self.data['len_tr_X'] - offset) / self.hp.seq_size
+
+        self.reset_hiddenstates()
         
         for i in xrange(0, (self.data['len_tr_X'] - offset) / self.hp.seq_size):
             outputs = self.train(i, it_lr, offset)
@@ -270,7 +276,9 @@ class ModelLMBase(ModelBase):
 
     def test_epoch(self):
         te_outputs = None
-        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - 1 - self.hp.warmup_size) * self.data['len_te_X'] / self.hp.seq_size
+        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * self.data['len_te_X'] / self.hp.seq_size
+
+        self.reset_hiddenstates()
 
         for i in xrange(0, self.data['len_te_X'] / self.hp.seq_size):
             outputs = self.test(i)
@@ -283,7 +291,9 @@ class ModelLMBase(ModelBase):
 
     def validation_epoch(self):
         te_outputs = None
-        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - 1 - self.hp.warmup_size) * self.data['len_va_X'] / self.hp.seq_size
+        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * self.data['len_va_X'] / self.hp.seq_size
+
+        self.reset_hiddenstates()
         
         for i in xrange(0, self.data['len_va_X'] / self.hp.seq_size):
             outputs = self.validate(i)
@@ -294,28 +304,32 @@ class ModelLMBase(ModelBase):
                 te_outputs = map(add, te_outputs, outputs)
         return te_outputs
 
-    def compile(self, cost, te_cost):
+    def compile(self, cost, te_cost, h_updates, te_h_updates):
         seq_idx = T.iscalar()
         learning_rate = T.fscalar()
         offset = T.iscalar()
 
         updates, norm_grad = self.hp.optimizer(cost, self.params.values(), lr=learning_rate)
 
+        norm_grad = 0.
+        for g in self.hiddenstates.values():
+            norm_grad += (g**2).sum()
+
         self.outidx = {'cost':0, 'norm_grad':1}
 
-        self.train = theano.function(inputs=[seq_idx, learning_rate, offset], updates=updates,
+        self.train = theano.function(inputs=[seq_idx, learning_rate, offset], updates=updates + h_updates,
                                      givens={
                                          self.X:self.data['tr_X'][offset + seq_idx * self.hp.seq_size : 
                                                                   offset + (seq_idx+1) * self.hp.seq_size]},
                                      outputs=[cost, norm_grad])
         
-        self.validate = theano.function(inputs=[seq_idx], 
+        self.validate = theano.function(inputs=[seq_idx], updates=te_h_updates,
                                         givens={
                                          self.X:self.data['va_X'][seq_idx * self.hp.seq_size : 
                                                                   (seq_idx+1) * self.hp.seq_size]},
                                     outputs=[te_cost])
         
-        self.test = theano.function(inputs=[seq_idx], 
+        self.test = theano.function(inputs=[seq_idx], updates=te_h_updates,
                                     givens={
                                          self.X:self.data['te_X'][seq_idx * self.hp.seq_size : 
                                                                   (seq_idx+1) * self.hp.seq_size]},
