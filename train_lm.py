@@ -2,6 +2,7 @@ import numpy as np
 import time
 from operator import add
 import numpy as np
+import random
 
 from toolbox import *
 from models import *
@@ -22,6 +23,7 @@ if __name__ == "__main__":
         resample_z = False
         train_perm = False
         walkforward = False
+        dynamic_eval = False
 
         #Model = lm_ffn.LM_ffn
         #Model = lm_gru.LM_gru
@@ -42,7 +44,9 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    data = penntree(path=data_path+'penntree/', batch_size=batch_size, n_train=0, overlap=True)
+    data = tokentext(path=data_path+'penntree/', name='penntree', batch_size=batch_size, n_train=0, overlap=True)
+    #data = tokentext(path=data_path+'text8/', name='text8', batch_size=batch_size, n_train=1000000, overlap=True)
+
     visualize_tokens(-1, data['tr_X'][0:min(len(data['tr_X']), 500)]/float(data['n_tokens']), data['shape_x'])
     
 
@@ -124,11 +128,29 @@ if __name__ == "__main__":
 
             model.save()
 
+    elif dynamic_eval:
+        # Dynamic evaluation
+        it_lr = float(learning_rate)
+
+        va_outputs = model.validation_epoch()
+        te_outputs = model.test_epoch()
+
+        dyn_va_outputs = model.dyn_validation_epoch(it_lr)
+        model.load()
+        dyn_te_outputs = model.dyn_test_epoch(it_lr)
+                
+        if model.type == 'LM':
+            # Lanugage model
+            print("0,%.2f,%.2f,%.2f,%.2f" % (np.exp(va_outputs[model.outidx['cost']]), 
+                                             np.exp(te_outputs[model.outidx['cost']]),
+                                             np.exp(dyn_va_outputs[model.outidx['cost']]), 
+                                             np.exp(dyn_te_outputs[model.outidx['cost']]) ))
+            
     else:
         # Full training data learning
         n_iterations = 10000
         freq_save = 2
-        freq_sample = 10
+        freq_sample = 2
         it_lr = float(learning_rate)
         #rnd_offset = np.arange(seq_size)
         rnd_offset = np.random.permutation(seq_size)
@@ -139,7 +161,7 @@ if __name__ == "__main__":
                 
             tr_outputs = model.train_epoch(it_lr, rnd_offset[it % seq_size])
             te_outputs = model.validation_epoch()
-            #te_outputs = model.test_epoch()
+            #tr_outputs = model.test_epoch()
                 
             if model.type == 'LM':
                 # Lanugage model
@@ -148,6 +170,10 @@ if __name__ == "__main__":
                                                 np.exp(te_outputs[model.outidx['cost']]),
                                                 tr_outputs[model.outidx['norm_grad']],
                                                 time.time() - begin))
+                # Generate samples
+                samples = model.decode(random.randint(0, data['n_tokens']))
+                with open("sample_text.txt", "a") as txtfile:
+                    txtfile.write(str(it) + ', ' + token_text(samples, data['vocabulary']) + '\n')
 
             # Save model parameters
             if hp.save_model and it % freq_save == 0:
