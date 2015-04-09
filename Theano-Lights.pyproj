@@ -15,6 +15,8 @@
     <InterpreterVersion>2.7</InterpreterVersion>
     <IsWindowsApplication>False</IsWindowsApplication>
     <Name>Theano-Lights</Name>
+    <CommandLineArguments>C:\GitHub\Theano-Lights\scripts\text8 --oov-rate 0.05</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
   <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
@@ -29,6 +31,7 @@
     <Compile Include="models\lm_sgru.py" />
     <Compile Include="models\lm_lstm.py" />
     <Compile Include="models\lm_ffn.py" />
+    <Compile Include="scripts\text_tokenizer.py" />
     <Compile Include="train_lm.py" />
     <Compile Include="train.py" />
     <Compile Include="models\draw_at_lstm2.py" />
@@ -50,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="models\" />
+    <Folder Include="scripts\" />
   </ItemGroup>
   <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />

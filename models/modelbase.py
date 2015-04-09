@@ -69,6 +69,10 @@ class ModelBase(object):
                         tr_outputs = map(add, tr_outputs, outputs)
         return tr_outputs
 
+    def load(self):
+        if os.path.isfile(self.filename):
+                self.params.load(self.filename)
+
 # --------------------------------------------------------------------------------------------------
 
 class ModelSLBase(ModelBase):
@@ -225,8 +229,9 @@ class ModelLMBase(ModelBase):
 
         self.X = T.imatrix()
         self.Y = T.ivector()
+        self.seed_idx = T.iscalar()
 
-        self.X.tag.test_value = np.random.randn(hp.batch_size, data['n_x']).astype(dtype=np.int32)
+        self.X.tag.test_value = np.random.randn(hp.seq_size, hp.batch_size).astype(dtype=np.int32)
 
         self.data = copy.copy(data)
         for key in ('tr_X', 'va_X', 'te_X', 'tr_Y', 'va_Y', 'te_Y'):
@@ -265,29 +270,12 @@ class ModelLMBase(ModelBase):
         
         for i in xrange(0, (self.data['len_tr_X'] - offset) / self.hp.seq_size):
             outputs = self.train(i, it_lr, offset)
-            #if i % 100 == 0 and i > 0:
-            #    print ("Batch %d" % (i))
             outputs = map(lambda x: x / float(seq_per_epoch), outputs)
             if i==0:
                 tr_outputs = outputs
             else:
                 tr_outputs = map(add, tr_outputs, outputs)
         return tr_outputs
-
-    def test_epoch(self):
-        te_outputs = None
-        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * self.data['len_te_X'] / self.hp.seq_size
-
-        self.reset_hiddenstates()
-
-        for i in xrange(0, self.data['len_te_X'] / self.hp.seq_size):
-            outputs = self.test(i)
-            outputs = map(lambda x: x / float(seq_per_epoch), outputs)
-            if te_outputs is None:
-                te_outputs = outputs
-            else:
-                te_outputs = map(add, te_outputs, outputs)
-        return te_outputs
 
     def validation_epoch(self):
         te_outputs = None
@@ -304,16 +292,58 @@ class ModelLMBase(ModelBase):
                 te_outputs = map(add, te_outputs, outputs)
         return te_outputs
 
-    def compile(self, cost, te_cost, h_updates, te_h_updates):
+    def test_epoch(self):
+        te_outputs = None
+        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * self.data['len_te_X'] / self.hp.seq_size
+
+        self.reset_hiddenstates()
+
+        for i in xrange(0, self.data['len_te_X'] / self.hp.seq_size):
+            outputs = self.test(i)
+            outputs = map(lambda x: x / float(seq_per_epoch), outputs)
+            if te_outputs is None:
+                te_outputs = outputs
+            else:
+                te_outputs = map(add, te_outputs, outputs)
+        return te_outputs
+
+    def dyn_validation_epoch(self, it_lr):
+        te_outputs = None
+        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * self.data['len_va_X'] / self.hp.seq_size
+
+        self.reset_hiddenstates()
+        
+        for i in xrange(0, self.data['len_va_X'] / self.hp.seq_size):
+            outputs = self.dyn_validate(i, it_lr)
+            outputs = map(lambda x: x / float(seq_per_epoch), outputs)
+            if te_outputs is None:
+                te_outputs = outputs
+            else:
+                te_outputs = map(add, te_outputs, outputs)
+        return te_outputs
+
+    def dyn_test_epoch(self, it_lr):
+        te_outputs = None
+        seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * self.data['len_te_X'] / self.hp.seq_size
+
+        self.reset_hiddenstates()
+
+        for i in xrange(0, self.data['len_te_X'] / self.hp.seq_size):
+            outputs = self.dyn_test(i, it_lr)
+            outputs = map(lambda x: x / float(seq_per_epoch), outputs)
+            if te_outputs is None:
+                te_outputs = outputs
+            else:
+                te_outputs = map(add, te_outputs, outputs)
+        return te_outputs
+    
+
+    def compile(self, cost, te_cost, h_updates, te_h_updates, spx):
         seq_idx = T.iscalar()
         learning_rate = T.fscalar()
         offset = T.iscalar()
 
         updates, norm_grad = self.hp.optimizer(cost, self.params.values(), lr=learning_rate)
-
-        norm_grad = 0.
-        for g in self.hiddenstates.values():
-            norm_grad += (g**2).sum()
 
         self.outidx = {'cost':0, 'norm_grad':1}
 
@@ -325,12 +355,27 @@ class ModelLMBase(ModelBase):
         
         self.validate = theano.function(inputs=[seq_idx], updates=te_h_updates,
                                         givens={
-                                         self.X:self.data['va_X'][seq_idx * self.hp.seq_size : 
-                                                                  (seq_idx+1) * self.hp.seq_size]},
+                                            self.X:self.data['va_X'][seq_idx * self.hp.seq_size : 
+                                                                    (seq_idx+1) * self.hp.seq_size]},
                                     outputs=[te_cost])
         
         self.test = theano.function(inputs=[seq_idx], updates=te_h_updates,
                                     givens={
-                                         self.X:self.data['te_X'][seq_idx * self.hp.seq_size : 
-                                                                  (seq_idx+1) * self.hp.seq_size]},
+                                            self.X:self.data['te_X'][seq_idx * self.hp.seq_size : 
+                                                                    (seq_idx+1) * self.hp.seq_size]},
                                     outputs=[te_cost])
+
+        if self.hp.dynamic_eval:
+            self.dyn_validate = theano.function(inputs=[seq_idx, learning_rate], updates=updates + te_h_updates,
+                                        givens={
+                                         self.X:self.data['va_X'][seq_idx * self.hp.seq_size : 
+                                                                  (seq_idx+1) * self.hp.seq_size]},
+                                        outputs=[te_cost])
+        
+            self.dyn_test = theano.function(inputs=[seq_idx, learning_rate], updates=updates + te_h_updates,
+                                        givens={
+                                             self.X:self.data['te_X'][seq_idx * self.hp.seq_size : 
+                                                                      (seq_idx+1) * self.hp.seq_size]},
+                                        outputs=[te_cost])
+        
+        self.decode = theano.function(inputs=[self.seed_idx], outputs=spx)

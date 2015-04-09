@@ -23,6 +23,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 srnd = MRG_RandomStreams()
 
+
 def shared(X, name=None, dtype=theano.config.floatX, borrow=False, broadcastable=None):
     return theano.shared(np.asarray(X, dtype=dtype), name=name, borrow=borrow, broadcastable=broadcastable)
 
@@ -416,7 +417,7 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 
 	return data
 
-def penntree(path='', batch_size=100, data_mode='words', n_train=0, overlap=True):
+def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0, overlap=True):
     # data_mode in ('words', 'chars')
 
     def slice_batches(data_x, seq_size):
@@ -424,7 +425,7 @@ def penntree(path='', batch_size=100, data_mode='words', n_train=0, overlap=True
         batch_data = data_x[:size].reshape(batch_size, -1).transpose()
         return batch_data
 
-    npz_data = np.load(path + "penntree.npz")
+    npz_data = np.load(path + name + ".npz")
     
     data = {}
     
@@ -439,13 +440,21 @@ def penntree(path='', batch_size=100, data_mode='words', n_train=0, overlap=True
     data['P'] = len(data['tr_X'])
     data['n_x'] = int(1)
     data['shape_x'] = (1, batch_size)
-    data['n_tokens'] = int(npz_data['n_words']) + 1
+    data['n_tokens'] = int(npz_data['n_words'])
     
-    #npz_data = np.load(path + "penntree_dict.npz")
-    #vocabulary = dict((word.lower(), word_index) 
-    #                        for word_index, word in enumerate(npz_data['unique_' + data_mode]))
+    npz_data = np.load(path + name + "_dict.npz")
+    data['vocabulary'] = npz_data['unique_' + data_mode]
 
     return data
+
+def token_text(token1hot, vocabulary):
+    text = ''
+    for i in xrange(token1hot.shape[0]):
+        for j in xrange(token1hot.shape[1]):
+            if token1hot[i,j] > 0 and not vocabulary[j] is None:
+                text += vocabulary[j] + ' '
+                break
+    return text
 
 #--------------------------------------------------------------------------------------------------
 
