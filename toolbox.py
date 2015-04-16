@@ -10,6 +10,8 @@ from random import shuffle
 from collections import OrderedDict
 import inspect
 import h5py
+import sys
+from skimage.measure import block_reduce
 
 import theano
 import theano.tensor as T
@@ -18,6 +20,7 @@ from theano.tensor.nnet.conv import conv2d
 from theano.tensor.signal.downsample import max_pool_2d
 from theano.tensor.shared_randomstreams import RandomStreams
 
+sys.setrecursionlimit(100000)
 
 #--------------------------------------------------------------------------------------------------
 
@@ -298,6 +301,28 @@ def concatdata(trX,vaX,teX=None):
         fullX[len(trX)+len(vaX):len(trX)+len(vaX)+len(teX)] = teX
         return fullX
 
+def downsample(data):
+    data['_tr_X'] = np.zeros((len(data['tr_X']), 14*14), dtype='float32')
+    data['_va_X'] = np.zeros((len(data['va_X']), 14*14), dtype='float32')
+    data['_te_X'] = np.zeros((len(data['te_X']), 14*14), dtype='float32')
+
+    for i in xrange(0, len(data['tr_X'])):
+        data['_tr_X'][i] = block_reduce(data['tr_X'][i].reshape(data['shape_x']), block_size=(2,2), func=np.mean).flatten() 
+
+    for i in xrange(0, len(data['va_X'])):
+        data['_va_X'][i] = block_reduce(data['va_X'][i].reshape(data['shape_x']), block_size=(2,2), func=np.mean).flatten() 
+
+    for i in xrange(0, len(data['te_X'])):
+        data['_te_X'][i] = block_reduce(data['te_X'][i].reshape(data['shape_x']), block_size=(2,2), func=np.mean).flatten() 
+
+    data['tr_X'] = data['_tr_X']
+    data['va_X'] = data['_va_X']
+    data['te_X'] = data['_te_X']
+
+    data['shape_x'] = (14,14)
+    data['n_x'] = 14*14
+    return data
+
 def freyfaces(path='', distort=False,shuffle=False,ntrain=60000,ntest=10000,onehot=True):
     f = open(os.path.join(path,'freyfaces.pkl'),'rb')
     data = cPickle.load(f)
@@ -417,7 +442,7 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 
 	return data
 
-def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0, overlap=True):
+def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0):
     # data_mode in ('words', 'chars')
 
     def slice_batches(data_x, seq_size):

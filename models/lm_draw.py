@@ -11,13 +11,14 @@ from toolbox import *
 from modelbase import *
 
 
-class LM_lstm(ModelLMBase):
+class LM_draw(ModelLMBase):
     def __init__(self, data, hp):
-        super(LM_lstm, self).__init__(self.__class__.__name__, data, hp)
+        super(LM_draw, self).__init__(self.__class__.__name__, data, hp)
         
         self.n_h = 1024
-        self.dropout = 0.5
-        
+        self.n_zpt = 256
+        self.dropout = 0.0
+
         self.params = Parameters()
         self.hiddenstates = Parameters()
         n_tokens = self.data['n_tokens']
@@ -34,13 +35,17 @@ class LM_lstm(ModelLMBase):
         else:
             with self.params:
                 W_emb = shared_normal((n_tokens, self.n_h), scale=hp.init_scale)
-                #W_o = shared_normal((n_h, n_tokens), scale=scale)
                 
-                W1 = shared_normal((self.n_h, self.n_h*gates), scale=hp.init_scale*1.5)
+                W1 = shared_normal((self.n_h*2, self.n_h*gates), scale=hp.init_scale*1.5)
                 V1 = shared_normal((self.n_h, self.n_h*gates), scale=hp.init_scale*1.5)
                 b1 = shared_zeros((self.n_h*gates,))
                 
-                W2 = shared_normal((self.n_h, self.n_h*gates), scale=hp.init_scale*1.5)
+                Wmu = shared_normal((self.n_h, self.n_zpt), scale=hp.init_scale)
+                Wsi = shared_normal((self.n_h, self.n_zpt), scale=hp.init_scale)
+                bmu = shared_zeros((self.n_zpt,))
+                bsi = shared_zeros((self.n_zpt,))
+
+                W2 = shared_normal((self.n_zpt, self.n_h*gates), scale=hp.init_scale*1.5)
                 V2 = shared_normal((self.n_h, self.n_h*gates), scale=hp.init_scale*1.5)
                 b2 = shared_zeros((self.n_h*gates,))
         
@@ -53,29 +58,40 @@ class LM_lstm(ModelLMBase):
             h = o_on * T.tanh(c)
             return h, c
 
-        def model(x, p, p_dropout):
+        def model(x, p, p_dropout, noise):
             input_size = x.shape[1]
 
             h0 = p.W_emb[x]  # (seq_len, batch_size, emb_size)
             h0 = dropout(h0, p_dropout)
 
             cost, h1, c1, h2, c2 = [0., b1_h, b1_c, b2_h, b2_c]
-                               
+            eps = srnd.normal((self.hp.seq_size, input_size, self.n_zpt), dtype=theano.config.floatX)
+            
             for t in xrange(0, self.hp.seq_size):
                 if t >= self.hp.warmup_size:
                     pyx = softmax(T.dot(h2, T.transpose(p.W_emb)))
                     cost += T.sum(T.nnet.categorical_crossentropy(pyx, theano_one_hot(x[t], n_tokens)))
 
-                h1, c1 = lstm(h0[t], h1, c1, p.W1, p.V1, p.b1)
+                h_x = concatenate([h0[t], h2], axis=1)
+                h1, c1 = lstm(h_x, h1, c1, p.W1, p.V1, p.b1)
                 h1 = dropout(h1, p_dropout)
-                h2, c2 = lstm(h1, h2, c2, p.W2, p.V2, p.b2)
+
+                mu_encoder = T.dot(h1, p.Wmu) + p.bmu
+                if noise:
+                    log_sigma_encoder = 0.5*(T.dot(h1, p.Wsi) + p.bsi) 
+                    cost += -0.5* T.sum(1 + 2*log_sigma_encoder - mu_encoder**2 - T.exp(2*log_sigma_encoder)) * 0.01
+                    z = mu_encoder + eps[t]*T.exp(log_sigma_encoder)
+                else:
+                    z = mu_encoder
+
+                h2, c2 = lstm(z, h2, c2, p.W2, p.V2, p.b2)
                 h2 = dropout(h2, p_dropout)
 
             h_updates = [(b1_h, h1), (b1_c, c1), (b2_h, h2), (b2_c, c2)]
             return cost, h_updates
         
-        cost, h_updates = model(self.X, self.params, self.dropout)
-        te_cost, te_h_updates = model(self.X, self.params, 0.0)
+        cost, h_updates = model(self.X, self.params, self.dropout, True)
+        te_cost, te_h_updates = model(self.X, self.params, 0.0, False)
 
          
         def generate(seed_idx, p):
@@ -87,13 +103,13 @@ class LM_lstm(ModelLMBase):
 
             spx = T.set_subtensor(spx[0, seed_idx], 1)
                             
-            for t in xrange(0, self.hp.seq_size):
-                if t > 0:
-                    pyx = softmax(T.dot(h2, T.transpose(p.W_emb)))
-                    spx = T.set_subtensor(spx[t,:], srnd.multinomial(pvals=pyx)[0])
+            #for t in xrange(0, self.hp.seq_size):
+            #    if t > 0:
+            #        pyx = softmax(T.dot(h2, T.transpose(p.W_emb)))
+            #        spx = T.set_subtensor(spx[t,:], srnd.multinomial(pvals=pyx)[0])
 
-                h1, c1 = lstm(p.W_emb[T.cast(spx[t], dtype='int32')], h1, c1, p.W1, p.V1, p.b1)
-                h2, c2 = lstm(h1, h2, c2, p.W2, p.V2, p.b2)
+            #    h1, c1 = lstm(p.W_emb[T.cast(spx[t], dtype='int32')], h1, c1, p.W1, p.V1, p.b1)
+            #    h2, c2 = lstm(h1, h2, c2, p.W2, p.V2, p.b2)
 
             return spx
 

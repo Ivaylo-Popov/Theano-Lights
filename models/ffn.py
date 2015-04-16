@@ -15,7 +15,7 @@ class FFN(ModelSLBase):
     def __init__(self, data, hp):
         super(FFN, self).__init__(self.__class__.__name__, data, hp)
         
-        self.n_h = 400
+        self.n_h = 800
 
         self.params = Parameters()
         n_x = self.data['n_x']
@@ -45,7 +45,7 @@ class FFN(ModelSLBase):
             py_x = softmax(T.dot(h3, params.w_o))
             return py_x
         
-        noise_py_x = model(self.X, self.params, 0.2, 0.2)
+        noise_py_x = model(self.X, self.params, 0.2, 0.5)
         cost = T.sum(T.nnet.categorical_crossentropy(noise_py_x, self.Y))
         
         pyx = model(self.X, self.params, 0., 0.)
