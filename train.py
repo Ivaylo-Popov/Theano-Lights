@@ -21,10 +21,10 @@ if __name__ == "__main__":
         debug = False
         resample_z = False
 
-        #Model = ffn.FFN
+        Model = ffn.FFN
         #Model = cnn.CNN
         
-        Model = vae1.Vae1
+        #Model = vae1.Vae1
         #Model = cvae.Cvae 
         #Model = draw_at_lstm1.Draw_at_lstm1 
         #Model = draw_at_lstm2.Draw_at_lstm2 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
         init_scale = 1.05  
         learning_rate = 0.0008 
-        lr_halflife = 20
+        lr_halflife = 50
 
         ''' sgd(0.001),  rmsprop(0.001),  adam(0.0005),  adamgc(0.0005),  esgd(0.01) '''
         optimizer = adamgc
@@ -50,12 +50,14 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    #data = mnist(path=data_path+'mnist/', nvalidation=0) 
-    data = mnistBinarized(path=data_path+'mnist/')  # only for UL models
+    data = mnist(path=data_path+'mnist/', nvalidation=0) 
+    #data = mnistBinarized(path=data_path+'mnist/')  # only for UL models
 
     #data = mnist(path=data_path+'mnist/', distort=3, shuffle=True) 
     #data = freyfaces(path=data_path+'frey/')
 
+    #data = downsample(data)
+    
     visualize(-1, data['tr_X'][0:min(len(data['tr_X']), 900)], data['shape_x'])
 
 
@@ -149,8 +151,10 @@ if __name__ == "__main__":
             model.permuteData(data)
                 
             tr_outputs = model.train_epoch(it_lr)
-            #te_outputs = model.test_epoch()
-            te_outputs = model.validation_epoch()
+            if len(data['va_X']) > 0:
+                te_outputs = model.validation_epoch()
+            else:
+                te_outputs = model.test_epoch()
                 
             if model.type == 'SL':
                 # Supervised learning

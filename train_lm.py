@@ -7,6 +7,7 @@ import random
 from toolbox import *
 from models import *
 
+
 if __name__ == "__main__":
 
 #   Hyper-parameters
@@ -16,7 +17,7 @@ if __name__ == "__main__":
         batch_size = 256
         test_batch_size = 256
         
-        load_model = False
+        load_model = True
         save_model = True
 
         debug = False
@@ -28,13 +29,14 @@ if __name__ == "__main__":
         #Model = lm_ffn.LM_ffn
         #Model = lm_gru.LM_gru
         Model = lm_lstm.LM_lstm
+        #Model = lm_draw.LM_draw
 
         seq_size = 20
         warmup_size = 1
 
         init_scale = 1.05
-        learning_rate = 1.5
-        lr_halflife = 40
+        learning_rate = 0.7
+        lr_halflife = 5
         optimizer = sgdgc
 
         description = ''
@@ -44,8 +46,8 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    data = tokentext(path=data_path+'penntree/', name='penntree', batch_size=batch_size, n_train=0, overlap=True)
-    #data = tokentext(path=data_path+'text8/', name='text8', batch_size=batch_size, n_train=1000000, overlap=True)
+    #data = tokentext(path=data_path+'penntree/', name='penntree', batch_size=batch_size, n_train=0)
+    data = tokentext(path=data_path+'text8/', name='text8', batch_size=batch_size, n_train=0)
 
     visualize_tokens(-1, data['tr_X'][0:min(len(data['tr_X']), 500)]/float(data['n_tokens']), data['shape_x'])
     
@@ -160,18 +162,18 @@ if __name__ == "__main__":
             model.permuteData(data)
                 
             tr_outputs = model.train_epoch(it_lr, rnd_offset[it % seq_size])
-            te_outputs = model.validation_epoch()
-            #tr_outputs = model.test_epoch()
+            va_outputs = model.validation_epoch()
+            #te_outputs = model.test_epoch()
                 
             if model.type == 'LM':
                 # Lanugage model
                 print("%d,%.2f,%.2f,%.2e,%.2f" % (it, 
                                                 np.exp(tr_outputs[model.outidx['cost']]), 
-                                                np.exp(te_outputs[model.outidx['cost']]),
+                                                np.exp(va_outputs[model.outidx['cost']]),
                                                 tr_outputs[model.outidx['norm_grad']],
                                                 time.time() - begin))
                 # Generate samples
-                samples = model.decode(random.randint(0, data['n_tokens']))
+                samples = model.decode(random.randint(0, data['n_tokens']-1))
                 with open("sample_text.txt", "a") as txtfile:
                     txtfile.write(str(it) + ', ' + token_text(samples, data['vocabulary']) + '\n')
 
@@ -181,3 +183,4 @@ if __name__ == "__main__":
             
             if lr_halflife != 0:
                 it_lr = float(it_lr*np.power(0.5, 1./lr_halflife))
+                
