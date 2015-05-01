@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{9f5e9e78-e105-4d30-a7cb-1103ab2beb2a}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>train.py</StartupFile>
+    <StartupFile>train_mp.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -27,15 +27,17 @@
   <ItemGroup>
     <Compile Include="models\draw_at_lstm1.py" />
     <Compile Include="models\draw_scrn1.py" />
+    <Compile Include="models\ffn_bn.py" />
     <Compile Include="models\lm_gru.py" />
     <Compile Include="models\lm_draw.py" />
+    <Compile Include="models\mp_ffn.py" />
+    <Compile Include="models\mp_lstm.py" />
+    <Compile Include="models\lm_lstm_bn.py" />
     <Compile Include="models\lm_sgru.py" />
     <Compile Include="models\lm_lstm.py" />
     <Compile Include="models\lm_ffn.py" />
-    <Compile Include="module1.py">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="scripts\text_tokenizer.py" />
+    <Compile Include="train_mp.py" />
     <Compile Include="train_lm.py" />
     <Compile Include="train.py" />
     <Compile Include="models\draw_at_lstm2.py" />

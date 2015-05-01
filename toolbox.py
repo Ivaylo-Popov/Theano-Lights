@@ -66,11 +66,14 @@ def gaussian(X, std=0.):
         X += srnd.normal(X.shape, std = std, dtype=theano.config.floatX)
     return X
 
-def shared_zeros(shape, dtype=theano.config.floatX, name=None):
-    return shared(np.zeros(shape), dtype=dtype, name=name)
+def shared_zeros(shape, dtype=theano.config.floatX, name=None, broadcastable=None):
+    return shared(np.zeros(shape), dtype=dtype, name=name, broadcastable=broadcastable)
 
 def shared_uniform(shape, scale=0.05):
     return shared(np.random.uniform(low=-scale, high=scale, size=shape))
+
+def shared_uniform(shape, range=[-0.05,0.05]):
+    return shared(np.random.uniform(low=range[0], high=range[1], size=shape))
 
 def shared_normal(shape, sv_adjusted=True, scale=1.0, name=None):
     if (sv_adjusted):
@@ -150,7 +153,7 @@ def sgd(cost, params, lr=1.0, alpha=0.1):
     
     return updates, norm_gs(params, grads)
 
-def sgdgc(cost, params, lr=1.0, max_magnitude=5.0, infDecay=0.1):
+def sgdgc(cost, params, lr=1.0, max_magnitude=1.0, infDecay=0.1):
     """SGD with gradient clipping"""
     grads = T.grad(cost=cost, wrt=params)
     updates = []
@@ -470,6 +473,40 @@ def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0):
     npz_data = np.load(path + name + "_dict.npz")
     data['vocabulary'] = npz_data['unique_' + data_mode]
 
+    return data
+
+def us_futures(name, path='', batch_size=100, n_train=-1, n_valid=-1):
+    
+    def slice_batches(data_x, seq_size):
+        size = (len(data_x) / batch_size) * batch_size
+        batch_data = data_x[:size].reshape(-1, batch_size, data_x.shape[-2], data_x.shape[-1]).transpose(0, 2, 1, 3)
+        return batch_data
+
+    npz_data = np.load(path + name + ".npz")
+    X = npz_data['X']
+    Y = npz_data['Y']*10000
+
+    data = {}
+
+    if n_valid > 0:
+        if n_train != -1:
+            n_train = min(n_train, len(X)-n_valid)
+        else:
+            n_train = len(X)-n_valid
+    
+    data['tr_X'] = slice_batches(X[:n_train], batch_size)
+    data['va_X'] = slice_batches(X[-n_valid:], batch_size)
+    data['te_X'] = data['va_X']
+
+    data['tr_Y'] = slice_batches(Y[:n_train], batch_size)
+    data['va_Y'] = slice_batches(Y[-n_valid:], batch_size)
+    data['te_Y'] = data['va_Y']
+
+    data['P'] = len(data['tr_X'])
+    data['n_x'] = data['tr_X'].shape[-1]
+    data['n_y'] = data['tr_Y'].shape[-1]
+    data['shape_x'] = (1, data['n_x'])
+    
     return data
 
 def token_text(token1hot, vocabulary):
