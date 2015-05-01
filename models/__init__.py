@@ -1,6 +1,7 @@
 
 __all__ = [
     "ffn",
+    "ffn_bn",
     "cnn", 
     "vae1",
     "cvae", 
@@ -10,7 +11,10 @@ __all__ = [
     "draw_sgru1",
     "lm_ffn",
     "lm_lstm",
+    "lm_lstm_bn",
     "lm_sgru",
     "lm_gru",
-    "lm_draw"
+    "lm_draw",
+    "mp_lstm",
+    "mp_ffn"
     ]

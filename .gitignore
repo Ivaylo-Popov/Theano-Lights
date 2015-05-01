@@ -2,6 +2,7 @@
 data
 savedmodels
 *.suo
+sample*
 samples*
 archives
 
@@ -48,3 +49,9 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+scripts/penntree_test
+scripts/penntree_valid
+scripts/text8_orig
+scripts/text8_valid
+scripts/text8_test
+scripts/text8_train

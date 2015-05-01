@@ -17,7 +17,7 @@ if __name__ == "__main__":
         batch_size = 256
         test_batch_size = 256
         
-        load_model = True
+        load_model = False
         save_model = True
 
         debug = False
@@ -28,15 +28,17 @@ if __name__ == "__main__":
 
         #Model = lm_ffn.LM_ffn
         #Model = lm_gru.LM_gru
-        Model = lm_lstm.LM_lstm
+        #Model = lm_lstm.LM_lstm
         #Model = lm_draw.LM_draw
+
+        Model = lm_lstm_bn.LM_lstm_bn
 
         seq_size = 20
         warmup_size = 1
 
         init_scale = 1.05
-        learning_rate = 0.7
-        lr_halflife = 5
+        learning_rate = 1.5
+        lr_halflife = 40
         optimizer = sgdgc
 
         description = ''
@@ -46,8 +48,8 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    #data = tokentext(path=data_path+'penntree/', name='penntree', batch_size=batch_size, n_train=0)
-    data = tokentext(path=data_path+'text8/', name='text8', batch_size=batch_size, n_train=0)
+    data = tokentext(path=data_path+'penntree/', name='penntree', batch_size=batch_size, n_train=0)
+    #data = tokentext(path=data_path+'text8/', name='text8', batch_size=batch_size, n_train=0)
 
     visualize_tokens(-1, data['tr_X'][0:min(len(data['tr_X']), 500)]/float(data['n_tokens']), data['shape_x'])
     
