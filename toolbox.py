@@ -169,7 +169,7 @@ def sgdgc(cost, params, lr=1.0, max_magnitude=1.0, infDecay=0.1):
     
     return updates, norm
 
-def sgdmgc(cost, params, lr=1.0, alpha=0.3, max_magnitude=5.0, infDecay=0.1):
+def sgdmgc(cost, params, lr=1.0, alpha=0.3, max_magnitude=1.0, infDecay=0.1):
     """SGD with momentum and gradient clipping"""
     grads = T.grad(cost=cost, wrt=params)
     updates = []
@@ -241,7 +241,7 @@ def adam(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8):
     updates.append((i, i_t))
     return updates, norm_gs(params, grads)
 
-def adamgc(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8, max_magnitude=5.0, infDecay=0.1):
+def adamgc(cost, params, lr=0.0002, b1=1.0, b2=0.01, e=1e-8, max_magnitude=1.0, infDecay=0.1):
     updates = []
     grads = T.grad(cost, params)
     
@@ -475,7 +475,7 @@ def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0):
 
     return data
 
-def us_futures(name, path='', batch_size=100, n_train=-1, n_valid=-1):
+def us_futures(name, path='', trading_inputs_name='', batch_size=100, n_train=-1, n_valid=-1):
     
     def slice_batches(data_x, seq_size):
         size = (len(data_x) / batch_size) * batch_size
@@ -484,9 +484,18 @@ def us_futures(name, path='', batch_size=100, n_train=-1, n_valid=-1):
 
     npz_data = np.load(path + name + ".npz")
     X = npz_data['X']
-    Y = npz_data['Y']*10000
+    Y = npz_data['Y']
 
     data = {}
+
+    data['trading_inputs'] = np.loadtxt(trading_inputs_name, dtype='float32', delimiter=',').transpose()
+
+    ids_x = np.arange(X.shape[-1])#[9:10]
+    ids_y = np.arange(Y.shape[-1])#[1:2]
+
+    X = X[:,:,ids_x]
+    Y = Y[:,:,ids_y]
+    data['trading_inputs'] = data['trading_inputs']#[:,1] ### 
 
     if n_valid > 0:
         if n_train != -1:
@@ -494,12 +503,12 @@ def us_futures(name, path='', batch_size=100, n_train=-1, n_valid=-1):
         else:
             n_train = len(X)-n_valid
     
-    data['tr_X'] = slice_batches(X[:n_train], batch_size)
-    data['va_X'] = slice_batches(X[-n_valid:], batch_size)
+    data['tr_X'] = slice_batches(X[:n_train], batch_size)#[10:]
+    data['va_X'] = slice_batches(X[n_train:n_train+n_valid], batch_size)#[:1]
     data['te_X'] = data['va_X']
 
-    data['tr_Y'] = slice_batches(Y[:n_train], batch_size)
-    data['va_Y'] = slice_batches(Y[-n_valid:], batch_size)
+    data['tr_Y'] = slice_batches(Y[:n_train], batch_size)#[10:]
+    data['va_Y'] = slice_batches(Y[n_train:n_train+n_valid], batch_size)#[:1]
     data['te_Y'] = data['va_Y']
 
     data['P'] = len(data['tr_X'])

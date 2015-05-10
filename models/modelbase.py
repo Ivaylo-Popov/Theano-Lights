@@ -421,6 +421,9 @@ class ModelMPBase(ModelBase):
             perm_idx = np.random.permutation(self.data['P'])
             self.data['tr_X'].set_value(self.data['tr_X'].get_value(borrow=True)[perm_idx], borrow=True)
             self.data['tr_Y'].set_value(self.data['tr_Y'].get_value(borrow=True)[perm_idx], borrow=True)
+            #perm_idx = np.random.permutation(511)
+            #self.data['tr_X'].set_value(self.data['tr_X'].get_value(borrow=True)[:,perm_idx], borrow=True)
+            #self.data['tr_Y'].set_value(self.data['tr_Y'].get_value(borrow=True)[:,perm_idx], borrow=True)
             if not data is None:
                 data['tr_X'] = data['tr_X'][perm_idx]
                 data['tr_Y'] = data['tr_Y'][perm_idx]
@@ -447,17 +450,17 @@ class ModelMPBase(ModelBase):
                 tr_outputs = map(add, tr_outputs, outputs)
         return tr_outputs
 
-    def validation_epoch(self):
+    def validation_epoch(self, offset=0):
         te_outputs = None
-        num_batches = self.data['len_va_X'][0] * (self.data['len_va_X'][1] / self.hp.seq_size)
+        num_batches = self.data['len_va_X'][0] * ((self.data['len_va_X'][1] - offset) / self.hp.seq_size)
         seq_per_epoch = self.hp.batch_size * (self.hp.seq_size - self.hp.warmup_size) * num_batches
 
         self.reset_hiddenstates()
         
         for i in xrange(0, num_batches):
-            group_idx = i / (self.data['len_va_X'][1] / self.hp.seq_size)
-            seq_idx = i % (self.data['len_va_X'][1] / self.hp.seq_size)
-            outputs = self.validate(group_idx, seq_idx)
+            group_idx = i / ((self.data['len_va_X'][1] - offset) / self.hp.seq_size)
+            seq_idx = i % ((self.data['len_va_X'][1] - offset) / self.hp.seq_size)
+            outputs = self.validate(group_idx, seq_idx, offset)
             outputs = map(lambda x: x / float(seq_per_epoch), outputs)
             if te_outputs is None:
                 te_outputs = outputs
@@ -519,17 +522,32 @@ class ModelMPBase(ModelBase):
                 te_outputs = map(add, te_outputs, outputs)
         return te_outputs
 
-    def compile(self, cost, te_cost, h_updates, te_h_updates, cost_base, te_cost_base, add_updates=[]):
+    def va_exposure_seq(self, offset=0):
+        exposure_seq = []
+        num_batches = self.data['len_va_X'][0] * ((self.data['len_va_X'][1] - offset) / self.hp.seq_size)
+        self.reset_hiddenstates()
+        
+        for i in xrange(0, num_batches):
+            group_idx = i / ((self.data['len_va_X'][1] - offset) / self.hp.seq_size)
+            seq_idx = i % ((self.data['len_va_X'][1] - offset) / self.hp.seq_size)
+            output = self.va_exposure(group_idx, seq_idx, offset)
+            exposure = output[0].transpose(1,0,2).reshape((-1, output[0].shape[-1]))
+            exposure_seq.append(exposure)
+
+        exposure_seq = np.concatenate(exposure_seq, axis=0)
+        return exposure_seq
+
+    def compile(self, cost_grad, cost, te_cost, h_updates, te_h_updates, cost_base, te_cost_base, info, te_info, add_updates=[], exposure=[]):
         group_idx = T.iscalar()
         seq_idx = T.iscalar()
         learning_rate = T.fscalar()
         offset = T.iscalar()
 
-        updates, norm_grad = self.hp.optimizer(cost, self.params.values(), lr=learning_rate)
+        updates, norm_grad = self.hp.optimizer(cost_grad, self.params.values(), lr=learning_rate)
         
         updates += add_updates
 
-        self.outidx = {'cost':0, 'cost_base':1, 'norm_grad':2 }
+        self.outidx = {'cost':0, 'cost_base':1, 'info':2, 'norm_grad':3}
 
         self.train = theano.function(inputs=[group_idx, seq_idx, learning_rate, offset], updates=updates + h_updates,
                                      givens={
@@ -539,41 +557,57 @@ class ModelMPBase(ModelBase):
                                          self.Y:self.data['tr_Y'][group_idx, 
                                                                   offset + seq_idx * self.hp.seq_size : 
                                                                   offset + (seq_idx+1) * self.hp.seq_size]},
-                                     outputs=[cost, cost_base, norm_grad])
+                                     outputs=[cost, cost_base, info, norm_grad])
         
-        self.validate = theano.function(inputs=[group_idx, seq_idx], updates=te_h_updates,
+        self.validate = theano.function(inputs=[group_idx, seq_idx, offset], updates=te_h_updates,
                                         givens={
                                             self.X:self.data['va_X'][group_idx, 
-                                                                     seq_idx * self.hp.seq_size : 
-                                                                    (seq_idx+1) * self.hp.seq_size],
+                                                                     offset + seq_idx * self.hp.seq_size : 
+                                                                    offset + (seq_idx+1) * self.hp.seq_size],
                                             self.Y:self.data['va_Y'][group_idx, 
-                                                                     seq_idx * self.hp.seq_size : 
-                                                                    (seq_idx+1) * self.hp.seq_size]},
-                                        outputs=[te_cost, te_cost_base])
+                                                                     offset + seq_idx * self.hp.seq_size : 
+                                                                    offset + (seq_idx+1) * self.hp.seq_size]},
+                                        outputs=[te_cost, te_cost_base, te_info])
         
-        self.test = theano.function(inputs=[group_idx, seq_idx], updates=te_h_updates,
+        self.test = theano.function(inputs=[group_idx, seq_idx, offset], updates=te_h_updates,
                                     givens={
                                             self.X:self.data['te_X'][group_idx, 
-                                                                     seq_idx * self.hp.seq_size : 
-                                                                    (seq_idx+1) * self.hp.seq_size],
+                                                                     offset + seq_idx * self.hp.seq_size : 
+                                                                    offset + (seq_idx+1) * self.hp.seq_size],
                                             self.Y:self.data['te_Y'][group_idx, 
-                                                                     seq_idx * self.hp.seq_size : 
-                                                                    (seq_idx+1) * self.hp.seq_size]},
-                                    outputs=[te_cost, te_cost_base])
+                                                                     offset + seq_idx * self.hp.seq_size : 
+                                                                    offset + (seq_idx+1) * self.hp.seq_size]},
+                                    outputs=[te_cost, te_cost_base, te_info])
 
-        #if self.hp.dynamic_eval:
-        #    self.dyn_validate = theano.function(inputs=[group_idx, seq_idx, learning_rate], updates=updates + te_h_updates,
-        #                                givens={
-        #                                 self.X:self.data['va_X'][group_idx, 
-        #                                                          seq_idx * self.hp.seq_size : 
-        #                                                          (seq_idx+1) * self.hp.seq_size]},
-        #                                outputs=[te_cost])
+        if self.hp.dynamic_eval:
+            self.dyn_validate = theano.function(inputs=[group_idx, seq_idx, learning_rate], updates=updates + te_h_updates,
+                                        givens={
+                                         self.X:self.data['va_X'][group_idx, 
+                                                                  seq_idx * self.hp.seq_size : 
+                                                                  (seq_idx+1) * self.hp.seq_size],
+                                         self.Y:self.data['va_Y'][group_idx, 
+                                                                  seq_idx * self.hp.seq_size : 
+                                                                  (seq_idx+1) * self.hp.seq_size]},
+                                        outputs=[te_cost, te_cost_base, te_info])
         
-        #    self.dyn_test = theano.function(inputs=[group_idx, seq_idx, learning_rate], updates=updates + te_h_updates,
-        #                                givens={
-        #                                     self.X:self.data['te_X'][group_idx, 
-        #                                                              seq_idx * self.hp.seq_size : 
-        #                                                              (seq_idx+1) * self.hp.seq_size]},
-        #                                outputs=[te_cost])
+            self.dyn_test = theano.function(inputs=[group_idx, seq_idx, learning_rate], updates=updates + te_h_updates,
+                                        givens={
+                                             self.X:self.data['te_X'][group_idx, 
+                                                                      seq_idx * self.hp.seq_size : 
+                                                                      (seq_idx+1) * self.hp.seq_size],
+                                             self.Y:self.data['va_Y'][group_idx, 
+                                                                      seq_idx * self.hp.seq_size : 
+                                                                      (seq_idx+1) * self.hp.seq_size]},
+                                        outputs=[te_cost, te_cost_base, te_info])
+
+        self.va_exposure = theano.function(inputs=[group_idx, seq_idx, offset], updates=te_h_updates,
+                                    givens={
+                                            self.X:self.data['te_X'][group_idx, 
+                                                                     offset + seq_idx * self.hp.seq_size : 
+                                                                    offset + (seq_idx+1) * self.hp.seq_size],
+                                            self.Y:self.data['va_Y'][group_idx, 
+                                                                     offset + seq_idx * self.hp.seq_size : 
+                                                                    offset + (seq_idx+1) * self.hp.seq_size]},
+                                    outputs=[exposure])
         
         #self.decode = theano.function(inputs=[self.seed_idx], outputs=spx)

@@ -15,9 +15,11 @@ class MP_lstm(ModelMPBase):
     def __init__(self, data, hp):
         super(MP_lstm, self).__init__(self.__class__.__name__, data, hp)
         
-        self.n_h = 20
-        self.dropout = 0.0
-        
+        self.n_h = 400
+        n_h = self.n_h
+        self.dropout = 0.1
+        self.delay = 1
+
         self.params = Parameters()
         self.hiddenstates = Parameters()
         gates = 4
@@ -39,8 +41,8 @@ class MP_lstm(ModelMPBase):
                 #W_s = shared_normal((self.n_h, self.data['n_x']), scale=hp.init_scale)
 
                 # Gaussian P(y|x)
-                W_mu = shared_normal((self.n_h, self.data['n_x']), scale=hp.init_scale)
-                b_mu = shared_zeros((self.data['n_x'],))
+                W_mu = shared_normal((self.n_h, self.data['n_y']), scale=hp.init_scale)
+                b_mu = shared_zeros((self.data['n_y'],))
                 #W_sigma = shared_normal((self.n_h, self.data['n_x']), scale=hp.init_scale)
                 #b_sigma = shared_zeros((self.data['n_x'],))
                 
@@ -55,11 +57,16 @@ class MP_lstm(ModelMPBase):
                 W3 = shared_normal((self.n_h, self.n_h), scale=hp.init_scale)
                 b3 = shared_zeros((self.n_h,))
         
-        def rnn(X, h, c, W, U, b):
-            g_on = T.tanh(T.dot(X,W) + T.dot(h,U) + b)
-            h = g_on[:,:self.n_h]
-            c = g_on[:,self.n_h:2*self.n_h]
-            return h, c
+        def gru(X, h, c, W, U, b):
+            z_t = T.nnet.sigmoid(T.dot(X,W[:,:n_h]) + T.dot(h,U[:,:n_h]) + b[:n_h])
+            r_t = T.nnet.sigmoid(T.dot(X,W[:,n_h:2*n_h]) + T.dot(h,U[:,n_h:2*n_h]) + b[n_h:2*n_h])
+            h_t = T.tanh(T.dot(X,W[:,2*n_h:3*n_h]) + r_t * T.dot(h,U[:,2*n_h:3*n_h]) + b[2*n_h:3*n_h])
+            return (1 - z_t) * h + z_t * h_t, c
+
+        def sgru(X, h, c, W, U, b):
+            z_t = T.tanh(T.dot(X,W[:,:n_h]) + T.dot(h,U[:,:n_h]) + b[:n_h])
+            h_t = T.tanh(T.dot(X,W[:,n_h:2*n_h]) + T.dot(h,U[:,n_h:2*n_h]) + b[n_h:2*n_h])
+            return z_t * h_t, c
 
         def lstm(X, h, c, W, U, b):
             g_on = T.dot(X,W) + T.dot(h,U) + b
@@ -70,28 +77,27 @@ class MP_lstm(ModelMPBase):
             h = o_on * T.tanh(c)
             return h, c
 
-        def model(x, p, p_dropout):
-            x = x * 500
-            batch_size = x.shape[1]
-            h0 = T.tanh(T.dot(x.reshape((-1, x.shape[-1])), p.W0) + p.b0)  # (seq_len * batch_size, features_size)
+        def model(X, Y, p, p_dropout):
+            h0 = T.tanh(T.dot(X.reshape((-1, X.shape[-1])), p.W0) + p.b0)  # (seq_len * batch_size, features_size)
             h0 = dropout(h0, p_dropout)
-            h0 = h0.reshape((-1, batch_size, h0.shape[-1]))
+            h0 = h0.reshape((-1, X.shape[1], h0.shape[-1]))
 
-            cost, cost_mse, h1, c1, h2, c2 = [0., 0., b1_h, b1_c, b2_h, b2_c]
+            cost, cost_base, info, h1, c1, h2, c2 = [0., 0., 0., b1_h, b1_c, b2_h, b2_c]
                                
-            for t in xrange(0, self.hp.seq_size):
+            for t in xrange(0, self.hp.seq_size-self.delay):
                 if t >= self.hp.warmup_size:
-                    h_decoder = T.tanh(T.dot(h2,W3) + b3)
+                    h_decoder = T.tanh(T.dot(h2, W3) + b3)
                     mu_pyx = T.dot(h_decoder, p.W_mu) + p.b_mu
                     #log_sigma_pyx = 0.5*(T.dot(h2, p.W_sigma) + p.b_sigma)
                     #cost += T.sum(0.5*np.log(2*np.pi) + log_sigma_pyx + 0.5*((x[t] - x[t-1] - mu_pyx)**2 / T.exp(2*log_sigma_pyx)))
-                    #cost += T.sum(0.5*(x[t] - mu_pyx)**2)
-                    #cost_mse += T.sum(0.5*(x[t] - x[t-1] - mu_pyx)**2)
                     
-                    cost += T.sum(0.5*(x[t] - x[t-1] - mu_pyx)**2)
-                    cost_mse += T.sum(0.5*(x[t] - x[t-1])**2)
-                
-                #h = (x[t] - T.dot(h1, W_m)) * T.dot(h1, W_s)
+                    cost += 0.5*T.sum((Y[t] - mu_pyx)**2)
+                    cost_base += 0.5*T.sum(Y[t]**2)
+
+                    info += T.concatenate((0.5*T.sum((Y[t] - mu_pyx)**2, axis=0, keepdims=True), 
+                                          0.5*T.sum(Y[t]**2, axis=0, keepdims=True)), axis=0).transpose()
+
+                #h = (X[t] - T.dot(h1, W_m)) * T.dot(h1, W_s)
 
                 h1, c1 = lstm(h0[t], h1, c1, p.W1, p.V1, p.b1)
                 h1 = dropout(h1, p_dropout)
@@ -99,10 +105,11 @@ class MP_lstm(ModelMPBase):
                 h2 = dropout(h2, p_dropout)
 
             h_updates = [(b1_h, h1), (b1_c, c1), (b2_h, h2), (b2_c, c2)]
-            return cost, cost_mse, h_updates
+            return cost, cost_base, h_updates, info
         
-        cost, cost_mse, h_updates = model(self.X, self.params, self.dropout)
-        te_cost, te_cost_mse, te_h_updates = model(self.X, self.params, 0.0)
+        mult_Y = 2.0
+        cost, cost_base, h_updates, info = model(self.X, self.Y[self.delay:]*mult_Y, self.params, self.dropout)
+        te_cost, te_cost_base, te_h_updates, te_info = model(self.X, self.Y[self.delay:]*mult_Y, self.params, 0.0)
 
-        self.compile(cost, te_cost, h_updates, te_h_updates, cost_mse, te_cost_mse)
+        self.compile(cost, cost, te_cost, h_updates, te_h_updates, cost_base, te_cost_base, info, te_info)
 

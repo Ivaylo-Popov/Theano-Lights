@@ -16,5 +16,9 @@ __all__ = [
     "lm_gru",
     "lm_draw",
     "mp_lstm",
-    "mp_ffn"
+    "mp_rnn",
+    "mp_ffn",
+    "me_rnn",
+    "me_rnn_bn",
+    "me_rnn2",
     ]

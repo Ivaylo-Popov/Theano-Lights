@@ -26,14 +26,15 @@ if __name__ == "__main__":
         walkforward = False
         dynamic_eval = False
 
-        Model = mp_ffn.MP_ffn
+        #Model = mp_ffn.MP_ffn
         #Model = mp_lstm.MP_lstm
+        Model = mp_rnn.MP_rnn
 
         seq_size = 20
         warmup_size = 1
 
-        init_scale = 1.05
-        learning_rate = 0.1  #1.5
+        init_scale = 1.1
+        learning_rate = 0.1
         lr_halflife = 500
         optimizer = sgdgc
 
@@ -44,7 +45,8 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    data = us_futures(path=data_path+'prices/', name='us_futures_r', batch_size=batch_size, n_train=-1, n_valid=5*64)
+    data = us_futures(path=data_path+'finance/',  trading_inputs_name='D:/Work/Quant-Lights/instruments/trading_inputs3.txt',
+                      name='us_futures_r_norm3_3np', batch_size=batch_size, n_train=-1, n_valid=5*64)
 
     visualize_tokens(-1, 
                      (data['tr_X'][0, :, 6]-np.min(data['tr_X'][0, :, 6], axis=0, keepdims=True))/
@@ -153,9 +155,14 @@ if __name__ == "__main__":
         freq_save = 2
         freq_sample = 2
         it_lr = float(learning_rate)
-        rnd_offset = np.arange(seq_size)
-        #rnd_offset = np.random.permutation(seq_size)
+        #rnd_offset = np.arange(seq_size)
+        rnd_offset = np.random.permutation(seq_size)
         #rnd_offset = [0] * seq_size
+
+        def r2sqrt(y, y_hat):
+            res = np.sqrt((y-y_hat)/y)
+            res = np.nan_to_num(res)
+            return res
 
         for it in range(n_iterations):
             begin = time.time()
@@ -165,13 +172,12 @@ if __name__ == "__main__":
             va_outputs = model.validation_epoch()
             #te_outputs = model.test_epoch()
             
-            tr_sharpe = np.sqrt((tr_outputs[model.outidx['cost_base']]-
-                     tr_outputs[model.outidx['cost']])/tr_outputs[model.outidx['cost_base']])
-            va_sharpe = np.sqrt((va_outputs[model.outidx['cost_base']]-
-                     va_outputs[model.outidx['cost']])/va_outputs[model.outidx['cost_base']])
+            np.savetxt('temp.csv', np.column_stack((
+                r2sqrt(tr_outputs[2][:,1],tr_outputs[2][:,0]), 
+                r2sqrt(va_outputs[2][:,1],va_outputs[2][:,0]))), delimiter=',')
 
-            tr_sharpe = 0 if math.isnan(tr_sharpe) else tr_sharpe
-            va_sharpe = 0 if math.isnan(va_sharpe) else va_sharpe
+            tr_sharpe = r2sqrt(tr_outputs[model.outidx['cost_base']], tr_outputs[model.outidx['cost']])
+            va_sharpe = r2sqrt(va_outputs[model.outidx['cost_base']], va_outputs[model.outidx['cost']])
 
             if model.type == 'MP':
                 # Lanugage model
