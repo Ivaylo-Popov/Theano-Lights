@@ -4,11 +4,18 @@ MNIST (means) - 	    Test error %	Sec/epoch (batch 1000)
  - ffn:					1.2%		0.5
  - cnn:					0.4%		30
 
- MNIST (binarized) - 	    Test lower bound	Sec/epoch (batch 1000)
+MNIST (binarized) - 	    Test lower bound	Sec/epoch (batch 1000)
  - vae1:				94		2
  - cvae:				92		25
  - draw_at_lstm2:			85		66 (batch 200, recurrent iterations 12)
  - draw_lstm1:				87		10
  - draw_sgru1:				87		8
+
+PTB (10k tokens)	    Test lower bound	Sec/epoch (batch 256)
+ - lm_lstm:		    		75		250
+
+text8 (23.8K tokens)
+ - lm_lstm (2048):			70		7600
+ 
 
 *Significant deviation from these numbers can indicate problems with the obtained version of the software, data files, Theano configuration or hardware

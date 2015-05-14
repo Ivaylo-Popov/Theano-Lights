@@ -106,8 +106,6 @@ class LM_lstm_bn(ModelLMBase):
             return h, c
 
         def model(x, p, sv, test, add_updates, p_dropout):
-            input_size = x.shape[1]
-
             h0 = p.W_emb[x]  # (seq_len, batch_size, emb_size)
             h0 = dropout(h0, p_dropout)
 
@@ -130,30 +128,9 @@ class LM_lstm_bn(ModelLMBase):
         cost, h_updates = model(self.X, self.params, self.shared_vars, False, add_updates, self.dropout)
         te_cost, te_h_updates = model(self.X, self.params, self.shared_vars, True, None, 0.0)
          
-        def generate(seed_idx, p):
-            spx = T.zeros((self.hp.seq_size, n_tokens), dtype='int32')
-            h1, c1, h2, c2 = [T.zeros((self.n_h)), 
-                              T.zeros((self.n_h)), 
-                              T.zeros((self.n_h)), 
-                              T.zeros((self.n_h))]
-
-            spx = T.set_subtensor(spx[0, seed_idx], 1)
-                            
-            for t in xrange(0, self.hp.seq_size):
-                if t > 0:
-                    pyx = softmax(T.dot(h2, T.transpose(p.W_emb)))
-                    spx = T.set_subtensor(spx[t,:], srnd.multinomial(pvals=pyx)[0])
-
-                h1, c1 = lstm(p.W_emb[T.cast(spx[t], dtype='int32')], h1, c1, p.W1, p.V1, p.b1)
-                h2, c2 = lstm(h1, h2, c2, p.W2, p.V2, p.b2)
-
-            return spx
-
-        spx = generate(self.seed_idx, self.params)
-
         add_updates_list = []
         for key, value in add_updates.iteritems():
             add_updates_list.append((key, value))
 
-        self.compile(cost, te_cost, h_updates, te_h_updates, spx, add_updates_list)
+        self.compile(cost, te_cost, h_updates, te_h_updates, add_updates_list)
 

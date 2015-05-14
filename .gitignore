@@ -2,8 +2,7 @@
 data
 savedmodels
 *.suo
-sample*
-samples*
+samples_*
 archives
 
 # Windows image file caches

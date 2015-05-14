@@ -22,14 +22,14 @@ if __name__ == "__main__":
         resample_z = False
 
         #Model = ffn.FFN
-        Model = ffn_bn.FFN_bn
+        #Model = ffn_bn.FFN_bn
         #Model = cnn.CNN
         
         #Model = vae1.Vae1
         #Model = cvae.Cvae 
         #Model = draw_at_lstm1.Draw_at_lstm1 
         #Model = draw_at_lstm2.Draw_at_lstm2 
-        #Model = draw_lstm1.Draw_lstm1 
+        Model = draw_lstm1.Draw_lstm1 
         #Model = draw_sgru1.Draw_sgru1 
 
         init_scale = 1.05  

@@ -131,14 +131,6 @@ def norm_gs(params, grads):
     for g in grads:
         norm_gs += (g**2).sum()
     
-    #num_params = 0.
-    #for p in params:
-    #    prod = 1.
-    #    for d in p.shape:
-    #        prod *= d
-    #    num_params += prod
-    #norm_gs /= T.cast(num_params, dtype=theano.config.floatX)
-
     return norm_gs
 
 def sgd(cost, params, lr=1.0, alpha=0.1):
@@ -153,19 +145,19 @@ def sgd(cost, params, lr=1.0, alpha=0.1):
     
     return updates, norm_gs(params, grads)
 
-def sgdgc(cost, params, lr=1.0, max_magnitude=1.0, infDecay=0.1):
+def sgdgc(cost, params, lr=1.0, max_magnitude=5.0, infDecay=0.1):
     """SGD with gradient clipping"""
     grads = T.grad(cost=cost, wrt=params)
     updates = []
 
     norm = norm_gs(params, grads)
     sqrtnorm = T.sqrt(norm)
-    not_finite = T.or_(T.isnan(sqrtnorm), T.isinf(sqrtnorm))
+    #not_finite = T.or_(T.isnan(sqrtnorm), T.isinf(sqrtnorm))
     adj_norm_gs = T.switch(T.ge(sqrtnorm, max_magnitude), max_magnitude / sqrtnorm, 1.)
 
     for p, g in zip(params, grads):
-        g = T.switch(not_finite, infDecay * p, g * adj_norm_gs)
-        updates.append((p, p - lr * g))  
+        #g = T.switch(not_finite, infDecay * p, g * adj_norm_gs)
+        updates.append((p, p - lr * g * adj_norm_gs))  
     
     return updates, norm
 
@@ -462,7 +454,6 @@ def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0):
         data['tr_X'] = data['tr_X'][:n_train/batch_size]
 
     data['va_X'] = slice_batches(npz_data['valid_' + data_mode], batch_size)
-    
     data['te_X'] = slice_batches(npz_data['test_' + data_mode], batch_size)
 
     data['P'] = len(data['tr_X'])
@@ -470,46 +461,12 @@ def tokentext(name, path='', batch_size=100, data_mode='words', n_train=0):
     data['shape_x'] = (1, batch_size)
     data['n_tokens'] = int(npz_data['n_words'])
     
-    npz_data = np.load(path + name + "_dict.npz")
-    data['vocabulary'] = npz_data['unique_' + data_mode]
+    #npz_data = np.load(path + name + "_dict.npz")
+    #data['vocabulary'] = npz_data['unique_' + data_mode]
 
     return data
 
-def us_futures(name, path='', batch_size=100, n_train=-1, n_valid=-1):
-    
-    def slice_batches(data_x, seq_size):
-        size = (len(data_x) / batch_size) * batch_size
-        batch_data = data_x[:size].reshape(-1, batch_size, data_x.shape[-2], data_x.shape[-1]).transpose(0, 2, 1, 3)
-        return batch_data
-
-    npz_data = np.load(path + name + ".npz")
-    X = npz_data['X']
-    Y = npz_data['Y']*10000
-
-    data = {}
-
-    if n_valid > 0:
-        if n_train != -1:
-            n_train = min(n_train, len(X)-n_valid)
-        else:
-            n_train = len(X)-n_valid
-    
-    data['tr_X'] = slice_batches(X[:n_train], batch_size)
-    data['va_X'] = slice_batches(X[-n_valid:], batch_size)
-    data['te_X'] = data['va_X']
-
-    data['tr_Y'] = slice_batches(Y[:n_train], batch_size)
-    data['va_Y'] = slice_batches(Y[-n_valid:], batch_size)
-    data['te_Y'] = data['va_Y']
-
-    data['P'] = len(data['tr_X'])
-    data['n_x'] = data['tr_X'].shape[-1]
-    data['n_y'] = data['tr_Y'].shape[-1]
-    data['shape_x'] = (1, data['n_x'])
-    
-    return data
-
-def token_text(token1hot, vocabulary):
+def text_fromtokens(token1hot, vocabulary):
     text = ''
     for i in xrange(token1hot.shape[0]):
         for j in xrange(token1hot.shape[1]):
@@ -528,34 +485,6 @@ def scale_to_unit_interval(ndar, eps=1e-8):
     return ndar
 
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0), scale_rows_=False, output_pixvals=True):
-    """
-    Transform an array with one flattened image per row, into an array in
-    which images are reshaped and layed out like tiles on a floor.
-
-    This function is useful for visualizing datasets whose rows are images,
-    and also columns of matrices for transforming those rows
-    (such as the first layer of a neural net).
-
-    :type X: a 2-D ndarray or a tuple of 4 channels, elements of which can
-    be 2-D ndarrays or None;
-    :param X: a 2-D array in which every row is a flattened image.
-
-    :type img_shape: tuple; (height, width)
-    :param img_shape: the original shape of each image
-
-    :type tile_shape: tuple; (rows, cols)
-    :param tile_shape: the number of images to tile (rows, cols)
-
-    :param output_pixvals: if output should be pixel values (i.e. int8
-    values) or floats
-
-    :param scale_rows_: if the values need to be scaled before
-    being plotted to [0,1] or not
-
-    :returns: array suitable for viewing as an image.
-    (See:`PIL.Image.fromarray`.)
-    :rtype: a 2-d array with same dtype as X.
-    """
     assert len(img_shape) == 2
     assert len(tile_shape) == 2
     assert len(tile_spacing) == 2
@@ -789,28 +718,3 @@ class AttentionDraw(object):
         I = I.reshape((windows.shape[0], self.img_height*self.img_width))
         I = 1./gamma * I 
         return I
-
-
-#class BatchNormalization(Layer):
-#    '''
-#        Reference: 
-#            Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift
-#                http://arxiv.org/pdf/1502.03167v3.pdf
-#    '''
-#    def __init__(self, input_shape, epsilon=1e-6, weights=None):
-#        self.init = initializations.get("uniform")
-#        self.input_shape = input_shape
-#        self.epsilon = epsilon
-
-#        self.gamma = self.init((self.input_shape))
-#        self.beta = shared_zeros(self.input_shape)
-
-#        self.params = [self.gamma, self.beta]
-#        if weights is not None:
-#            self.set_weights(weights)
-
-#    def output(self, train):
-#        X = self.get_input(train)
-#        X_normed = (X - X.mean(keepdims=True)) / (X.std(keepdims=True) + self.epsilon)
-#        out = self.gamma * X_normed + self.beta
-#        return out

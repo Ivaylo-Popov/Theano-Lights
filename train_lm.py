@@ -26,12 +26,10 @@ if __name__ == "__main__":
         walkforward = False
         dynamic_eval = False
 
-        #Model = lm_ffn.LM_ffn
         #Model = lm_gru.LM_gru
-        #Model = lm_lstm.LM_lstm
         #Model = lm_draw.LM_draw
-
-        Model = lm_lstm_bn.LM_lstm_bn
+        Model = lm_lstm.LM_lstm
+        #Model = lm_lstm_bn.LM_lstm_bn
 
         seq_size = 20
         warmup_size = 1
@@ -174,10 +172,6 @@ if __name__ == "__main__":
                                                 np.exp(va_outputs[model.outidx['cost']]),
                                                 tr_outputs[model.outidx['norm_grad']],
                                                 time.time() - begin))
-                # Generate samples
-                samples = model.decode(random.randint(0, data['n_tokens']-1))
-                with open("sample_text.txt", "a") as txtfile:
-                    txtfile.write(str(it) + ', ' + token_text(samples, data['vocabulary']) + '\n')
 
             # Save model parameters
             if hp.save_model and it % freq_save == 0:
