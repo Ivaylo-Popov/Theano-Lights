@@ -54,3 +54,6 @@ scripts/text8_orig
 scripts/text8_valid
 scripts/text8_test
 scripts/text8_train
+sample_text.txt
+scripts/penntree.npz
+scripts/penntree_orig.npz
