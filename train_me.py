@@ -35,7 +35,7 @@ if __name__ == "__main__":
         warmup_size = 1
 
         init_scale = 1.1
-        learning_rate = 0.003
+        learning_rate = 0.05
         lr_halflife = 500
         optimizer = sgdgc
 
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     #                  trading_inputs_name='D:/Work/Quant-Lights/instruments/trading_inputs3.txt', batch_size=batch_size, n_train=-1, n_valid=5*64)
 
     #data = us_futures(path=data_path+'finance/', name='us_futures4a',
-    #                  trading_inputs_name='D:/Work/Quant-Lights/instruments/trading_inputs3.txt', batch_size=batch_size, n_train=-1, n_valid=5*64)  # 18*64, n_valid=1*32)
+    #                  trading_inputs_name='D:/Work/Quant-Lights/instruments/trading_inputs3.txt', batch_size=batch_size, n_train=-1, n_valid=3*64)  # 18*64, n_valid=1*32)
 
     data = us_futures(path=data_path+'finance/', name='eu_futures1a_xeu',
                       trading_inputs_name='D:/Work/Quant-Lights/instruments/eu_trading_inputs1.txt', batch_size=batch_size, n_train=-1, n_valid=3*64)  # 18*64, n_valid=1*32)
@@ -215,7 +215,7 @@ if __name__ == "__main__":
 
             exposure = model.va_exposure_seq()
             np.savetxt('exposure.csv', exposure, delimiter=',')
-            #np.savetxt('exposure.csv', exposure.reshape((-1, 500, 2)).transpose(2, 0, 1).reshape((-1,500)), delimiter=',')
+            #np.savetxt('exposure.csv', exposure.reshape((-1, 500, 2)).transpose(2, 0, 1).reshape((-1, 500)), delimiter=',')
             
             if lr_halflife != 0:
                 it_lr = float(it_lr*np.power(0.5, 1./lr_halflife))

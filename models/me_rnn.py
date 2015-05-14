@@ -60,7 +60,7 @@ class ME_rnn(ModelMPBase):
             cost, cost_var, m, info, h1, h2 = [0., 0., 0., 0., b1_h, b2_h]
             exposure = T.zeros_like(Y, dtype='float32')
 
-            #self.trading_inputs[0] = self.trading_inputs[0] * 0.0    ###
+            #self.trading_inputs[0] = self.trading_inputs[0] * 5.0    ###
 
             for t in xrange(0, self.hp.seq_size-self.delay):
                 #if t % 2==0:
