@@ -1,4 +1,4 @@
-Obtain the following files and change data_path in train.py to the desired location:
+Obtain the following files and change data_path in train.py/train_lm.py to the desired location:
 
 MNIST
 --------------------------
@@ -19,3 +19,10 @@ Frey Faces:
 freyfaces.pkl
 
 
+Penn Treebank:
+--------------------------
+penntree.npz
+
+text8:
+--------------------------
+text8.npz

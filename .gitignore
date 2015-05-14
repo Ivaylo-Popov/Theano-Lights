@@ -57,3 +57,4 @@ scripts/text8_train
 sample_text.txt
 scripts/penntree.npz
 scripts/penntree_orig.npz
+scripts/penntree_train

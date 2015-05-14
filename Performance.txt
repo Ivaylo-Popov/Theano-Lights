@@ -11,10 +11,10 @@ MNIST (binarized) - 	    Test lower bound	Sec/epoch (batch 1000)
  - draw_lstm1:				87		10
  - draw_sgru1:				87		8
 
-PTB (10k tokens)	    Test lower bound	Sec/epoch (batch 256)
+PTB (10k tokens)	    Test perplexity	Sec/epoch (batch 256)
  - lm_lstm:		    		75		250
 
-text8 (23.8K tokens)
+text8 (23.8K tokens)	    Test perplexity	Sec/epoch (batch 256)
  - lm_lstm (2048):			70		7600
  
 
