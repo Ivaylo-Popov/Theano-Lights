@@ -9,6 +9,7 @@ Included models:
  * Variational Autoencoder  (VAE)
  * Convolutional Variational Autoencoder (CVAE)
  * Deep Recurrent Attentive Writer (DRAW)
+ * Recurrent neural network (RNN)
  * LSTM Language model
 
 Included features:
