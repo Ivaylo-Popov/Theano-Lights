@@ -114,12 +114,12 @@ class FFN_bn_vat(ModelSLBase):
             h4 = dropout(rectify(h4), p_drop_hidden)
 
             py_x = softmax(T.dot(h4, params.w_o))
-            return py_x, 0.0
+            return py_x
         
         add_updates = []
 
         x = self.X + gaussian(self.X.shape, 0.1)
-        py_x, px_h = model(x, self.params, self.shared_vars, dropout_rate, False, add_updates)
+        py_x = model(x, self.params, self.shared_vars, dropout_rate, False, add_updates)
         cost = -T.sum(self.Y * T.log(py_x))
         
         # VAT
@@ -133,19 +133,19 @@ class FFN_bn_vat(ModelSLBase):
         
             for power_it in xrange(0, adv_power_iter):
                 d = adv_X*adv_est_noise
-                adv_est_py_x, _ = model(x + d, self.params, self.shared_vars, dropout_rate, False, None)
+                adv_est_py_x = model(x + d, self.params, self.shared_vars, dropout_rate, False, None)
                 cost_adv = -T.sum(py_x * T.log(adv_est_py_x))
                 adv_X = T.grad(cost=cost_adv, wrt=d)
                 adv_X = normalize(theano.gradient.disconnected_grad(adv_X))
         
-            adv_py_x, _ = model(x + adv_X*adv_noise, self.params, self.shared_vars, dropout_rate, False, None)
+            adv_py_x = model(x + adv_X*adv_noise, self.params, self.shared_vars, dropout_rate, False, None)
             py_x_hat = theano.gradient.disconnected_grad(py_x)
             adv_cost = -T.sum(py_x_hat * T.log(adv_py_x))
 
             cost += adv_cost_coeff*adv_cost
 
         # -------------------------------------------------
-        pyx, _ = model(self.X, self.params, self.shared_vars, 0., True, None)
+        pyx = model(self.X, self.params, self.shared_vars, 0., True, None)
         map_pyx = T.argmax(pyx, axis=1)
         error_map_pyx = T.sum(T.neq(map_pyx, T.argmax(self.Y, axis=1)))
 

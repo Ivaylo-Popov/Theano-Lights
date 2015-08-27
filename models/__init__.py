@@ -16,7 +16,6 @@ __all__ = [
     "draw_sgru1",
     "lm_lstm",
     "lm_lstm_bn",
-    "lm_sgru",
     "lm_gru",
     "lm_draw"
     ]
