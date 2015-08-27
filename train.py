@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     #data = downsample(data)
     
-    visualize(-1, data['tr_X'][0:min(len(data['tr_X']), 900)], data['shape_x'])
+    #visualize(-1, data['tr_X'][0:min(len(data['tr_X']), 900)], data['shape_x'])
 
 
 #   Training

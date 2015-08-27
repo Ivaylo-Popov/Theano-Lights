@@ -1,4 +1,4 @@
-Obtain the following files and change data_path in train.py/train_lm.py to the desired location:
+Obtain the following files and place them under folder data/'dataset name' or alternatively change data_path in train.py or train_lm.py to the desired location.
 
 MNIST
 Location : http://yann.lecun.com/exdb/mnist/
@@ -32,4 +32,4 @@ text8:
 text8.npz
 
 
-Contact me if you have difficulties obtaining and converting the data sets. 
+Contact me if you experience difficulties obtaining and converting the data sets. 
