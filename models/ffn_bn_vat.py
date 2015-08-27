@@ -12,9 +12,9 @@ from modelbase import *
 import itertools
 
 
-class FFN_bn(ModelSLBase):
+class FFN_bn_vat(ModelSLBase):
     """
-    Feedforward neural network with batch normalization and contractive cost
+    Virtual adversarial training with batch normalization
     """
 
     def save(self):
@@ -24,19 +24,21 @@ class FFN_bn(ModelSLBase):
         self.shared_vars.save(self.filename + '_vars')
 
     def __init__(self, data, hp):
-        super(FFN_bn, self).__init__(self.__class__.__name__, data, hp)
+        super(FFN_bn_vat, self).__init__(self.__class__.__name__, data, hp)
         
-        self.epsilon = 0.0001
+        self.epsilon = 0.001
 
         self.params = Parameters()
         self.shared_vars = Parameters()
         n_x = self.data['n_x']
         n_y = self.data['n_y']
         n_h1 = 1200
-        n_h2 = 1000
-        n_h3 = 800
-        n_h4 = 800
+        n_h2 = 800
+        n_h3 = 600
+        n_h4 = 400
         scale = hp.init_scale
+
+        dropout_rate = 0.3
 
         if hp.load_model and os.path.isfile(self.filename):
             self.params.load(self.filename)
@@ -44,13 +46,21 @@ class FFN_bn(ModelSLBase):
         else:
             with self.params:
                 w_h = shared_normal((n_x, n_h1), scale=scale)
+                gamma = shared_uniform((n_h1,), range=[0.95, 1.05])
                 b_h = shared_zeros((n_h1,))
+
                 w_h2 = shared_normal((n_h1, n_h2), scale=scale)
+                gamma2 = shared_uniform((n_h2,), range=[0.95, 1.05])
                 b_h2 = shared_zeros((n_h2,))
+
                 w_h3 = shared_normal((n_h2, n_h3), scale=scale)
+                gamma3 = shared_uniform((n_h3,), range=[0.95, 1.05])
                 b_h3 = shared_zeros((n_h3,))
+
                 w_h4 = shared_normal((n_h3, n_h4), scale=scale)
+                gamma4 = shared_uniform((n_h4,), range=[0.95, 1.05])
                 b_h4 = shared_zeros((n_h4,))
+
                 w_o = shared_normal((n_h4, n_y), scale=scale)
 
             with self.shared_vars:
@@ -72,9 +82,10 @@ class FFN_bn(ModelSLBase):
                 m = T.mean(X, axis=0, keepdims=True)
                 v = T.sqrt(T.var(X, axis=0, keepdims=True) + self.epsilon)
                 
-                mulfac = 1.0/100.0
-                add_updates.append((m_shared, (1.0-mulfac)*m_shared + mulfac*m))
-                add_updates.append((v_shared, (1.0-mulfac)*v_shared + mulfac*v))
+                if not add_updates is None:
+                    mulfac = 1.0/100
+                    add_updates.append((m_shared, (1.0-mulfac)*m_shared + mulfac*m))
+                    add_updates.append((v_shared, (1.0-mulfac)*v_shared + mulfac*v))
             else:
                 m = m_shared
                 v = v_shared
@@ -86,34 +97,55 @@ class FFN_bn(ModelSLBase):
             return X_hat
 
         def model(X, params, sv, p_drop_hidden, test, add_updates):
-            h = batch_norm(T.dot(X, params.w_h), sv.m_shared, sv.v_shared, test, add_updates) + params.b_h
+            h = batch_norm(T.dot(X, params.w_h), sv.m_shared, sv.v_shared, test, add_updates)
+            h = params.gamma * h + params.b_h
             h = dropout(rectify(h), p_drop_hidden)
 
-            h2 = batch_norm(T.dot(h, params.w_h2), sv.m_shared2, sv.v_shared2, test, add_updates) + params.b_h2
+            h2 = batch_norm(T.dot(h, params.w_h2), sv.m_shared2, sv.v_shared2, test, add_updates)
+            h2 = params.gamma2 * h2 + params.b_h2
             h2 = dropout(rectify(h2), p_drop_hidden)
 
-            h3 = batch_norm(T.dot(h2, params.w_h3), sv.m_shared3, sv.v_shared3, test, add_updates) + params.b_h3
+            h3 = batch_norm(T.dot(h2, params.w_h3), sv.m_shared3, sv.v_shared3, test, add_updates)
+            h3 = params.gamma3 * h3 + params.b_h3
             h3 = dropout(rectify(h3), p_drop_hidden)
 
-            h4 = batch_norm(T.dot(h3, params.w_h4), sv.m_shared4, sv.v_shared4, test, add_updates) + params.b_h4
+            h4 = batch_norm(T.dot(h3, params.w_h4), sv.m_shared4, sv.v_shared4, test, add_updates)
+            h4 = params.gamma4 * h4 + params.b_h4
             h4 = dropout(rectify(h4), p_drop_hidden)
 
             py_x = softmax(T.dot(h4, params.w_o))
-            return py_x
+            return py_x, 0.0
         
         add_updates = []
 
-        noise_py_x = model(self.X + gaussian(self.X.shape, 0.2), self.params, self.shared_vars, 0.5, False, add_updates)
-        cost_y2 = -T.sum(self.Y * T.log(noise_py_x))
+        x = self.X + gaussian(self.X.shape, 0.1)
+        py_x, px_h = model(x, self.params, self.shared_vars, dropout_rate, False, add_updates)
+        cost = -T.sum(self.Y * T.log(py_x))
         
-        #clean_py_x = model(self.X, self.params, self.shared_vars, 0.0, 0.5, True, None)
-        #cost_y = T.sum(T.nnet.categorical_crossentropy(clean_py_x, self.Y))
-        #cost_x = T.sum(T.grad(cost=cost_y2, wrt=self.X)**2)
-        #cost_x2 = T.sum((T.grad(cost=cost_y, wrt=self.X)-T.grad(cost=cost_y2, wrt=self.X))**2)
+        # VAT
+        adv_cost_coeff = 1.0
+        adv_est_noise = 1e-6
+        adv_noise = 3.0
+        adv_power_iter = 1
 
-        cost = cost_y2  #+ 0.2*cost_x + 0.1*cost_x2
+        if adv_cost_coeff > 0:
+            adv_X = normalize(gaussian(self.X.shape, 1.0))
         
-        pyx = model(self.X, self.params, self.shared_vars, 0., True, None)
+            for power_it in xrange(0, adv_power_iter):
+                d = adv_X*adv_est_noise
+                adv_est_py_x, _ = model(x + d, self.params, self.shared_vars, dropout_rate, False, None)
+                cost_adv = -T.sum(py_x * T.log(adv_est_py_x))
+                adv_X = T.grad(cost=cost_adv, wrt=d)
+                adv_X = normalize(theano.gradient.disconnected_grad(adv_X))
+        
+            adv_py_x, _ = model(x + adv_X*adv_noise, self.params, self.shared_vars, dropout_rate, False, None)
+            py_x_hat = theano.gradient.disconnected_grad(py_x)
+            adv_cost = -T.sum(py_x_hat * T.log(adv_py_x))
+
+            cost += adv_cost_coeff*adv_cost
+
+        # -------------------------------------------------
+        pyx, _ = model(self.X, self.params, self.shared_vars, 0., True, None)
         map_pyx = T.argmax(pyx, axis=1)
         error_map_pyx = T.sum(T.neq(map_pyx, T.argmax(self.Y, axis=1)))
 

@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{9f5e9e78-e105-4d30-a7cb-1103ab2beb2a}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>train_lm.py</StartupFile>
+    <StartupFile>train.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -27,6 +27,12 @@
   <ItemGroup>
     <Compile Include="models\draw_at_lstm1.py" />
     <Compile Include="models\draw_scrn1.py" />
+    <Compile Include="models\ffn_bn_vat_lae.py" />
+    <Compile Include="models\ffn_lae.py" />
+    <Compile Include="models\ffn_ace.py" />
+    <Compile Include="models\ffn_bn_vat.py" />
+    <Compile Include="models\ffn_vat.py" />
+    <Compile Include="models\rbfn.py" />
     <Compile Include="models\ffn_bn.py" />
     <Compile Include="models\lm_gru.py" />
     <Compile Include="models\lm_draw.py" />

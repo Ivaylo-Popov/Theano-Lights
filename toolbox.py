@@ -61,10 +61,11 @@ def gdropout(X, p=0.):
         X *= srnd.normal(X.shape, avg=1, std=p, dtype=theano.config.floatX)
     return X
 
-def gaussian(X, std=0.):
+def gaussian(shape, std=0.):
     if std > 0:
-        X += srnd.normal(X.shape, std = std, dtype=theano.config.floatX)
-    return X
+        return srnd.normal(shape, std = std, dtype=theano.config.floatX)
+    else:
+        return T.zeros_like(shape, dtype=theano.config.floatX)
 
 def shared_zeros(shape, dtype=theano.config.floatX, name=None, broadcastable=None):
     return shared(np.zeros(shape), dtype=dtype, name=name, broadcastable=broadcastable)
@@ -124,6 +125,11 @@ def concatenate(tensor_list, axis=0):
 def batch_col(input_size, c):
     return T.zeros((input_size, c.shape[0])) + c
 
+def normalize(v):
+    v = v / (1e-6 + T.max(T.abs_(v), axis=1, keepdims=True))
+    v_2 = T.sum(v**2, axis=1, keepdims=True)
+    return v / T.sqrt(1e-6 + v_2)
+
 #--------------------------------------------------------------------------------------------------
 
 def norm_gs(params, grads):
@@ -161,7 +167,7 @@ def sgdgc(cost, params, lr=1.0, max_magnitude=5.0, infDecay=0.1):
     
     return updates, norm
 
-def sgdmgc(cost, params, lr=1.0, alpha=0.3, max_magnitude=5.0, infDecay=0.1):
+def sgdmgc(cost, params, lr=1.0, alpha=0.1, max_magnitude=5.0, infDecay=0.1):
     """SGD with momentum and gradient clipping"""
     grads = T.grad(cost=cost, wrt=params)
     updates = []
@@ -210,7 +216,7 @@ def esgd(cost, params, lr=0.02, e=1e-2):
         updates.append((p, p - g / (T.sqrt(acc_new/i_t) + e) * lr))
     return updates, norm_gs(params, grads)
 
-def adam(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8):
+def adam(cost, params, lr=0.0002, b1=0.1, b2=0.001, e=1e-8):
     updates = []
     grads = T.grad(cost, params)
     i = shared(floatX(0.))
@@ -233,7 +239,41 @@ def adam(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8):
     updates.append((i, i_t))
     return updates, norm_gs(params, grads)
 
-def adamgc(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8, max_magnitude=5.0, infDecay=0.1):
+def adamgc_(cost, params, lr=0.0002, b1=0.1, b2=0.01, e=1e-8, max_magnitude=5.0, infDecay=0.1):
+    updates = []
+    grads = T.grad(cost, params)
+    
+    norm = norm_gs(params, grads)
+    sqrtnorm = T.sqrt(norm)
+    not_finite = T.or_(T.isnan(sqrtnorm), T.isinf(sqrtnorm))
+    adj_norm_gs = T.switch(T.ge(sqrtnorm, max_magnitude), max_magnitude / sqrtnorm, 1.)
+
+    i = shared(floatX(0.))
+    i_t = i + 1.
+    fix1 = 1. - (1. - b1)**i_t
+    fix2 = 1. - (1. - b2)**i_t
+    lr_t = lr * (T.sqrt(fix2) / fix1)
+    for p, g in zip(params, grads):
+        g = T.switch(not_finite, infDecay * p, g * adj_norm_gs)
+        m = shared(p.get_value() * 0.)
+        v = shared(p.get_value() * 0.)
+        m_t = (b1 * g) + ((1. - b1) * m) 
+        v_t = (b2 * T.sqr(g)) + ((1. - b2) * v)
+        g_t = m_t / (T.sqrt(v_t) + e)
+        p_t = p - (lr_t * g_t)
+
+        #e_t = shared(p.get_value() * 0.)
+        #de_t = (srnd.normal(p.shape, std = 0.05, dtype=theano.config.floatX)*p_t - e_t)*0.05  #*p_t
+        #p_t = p_t + de_t
+        #updates.append((e_t, e_t + de_t))
+
+        updates.append((m, m_t))
+        updates.append((v, v_t))
+        updates.append((p, p_t))
+    updates.append((i, i_t))
+    return updates, norm
+
+def adamgc(cost, params, lr=0.0002, b1=0.1, b2=0.001, e=1e-8, max_magnitude=5.0, infDecay=0.1):
     updates = []
     grads = T.grad(cost, params)
     
@@ -343,6 +383,10 @@ def freyfaces(path='', distort=False,shuffle=False,ntrain=60000,ntest=10000,oneh
     
     return data
 
+def mnistPkl(filename):
+    train_set_x = numpy.concatenate((train_set_x, valid_set_x), axis=0)
+    train_set_y = numpy.concatenate((train_set_y, valid_set_y), axis=0)
+
 def mnistBinarized(path=''):
     train_x = h5py.File(path+"binarized_mnist-train.h5")['data'][:]
     valid_x = h5py.File(path+"binarized_mnist-valid.h5")['data'][:]
@@ -363,14 +407,32 @@ def mnistBinarized(path=''):
 def mnist2(path=''):
     filepath = os.path.join(path,'mnist.pkl.gz')
     f = gzip.open(filepath, 'rb')
-    (trX,trY),(vaX,vaY),(teX,teY) = cPickle.load(f)
+    (trX,trY),(vaX,vaY),(teX,teY) = pickle.load(f)
     f.close()
 
+    trX = np.concatenate((trX, vaX), axis=0)
+    trY = np.concatenate((trY, vaY), axis=0)
+    vaX = vaX[1:0]
+    vaY = vaY[1:0]
+    
     trY = one_hot(trY, 10)
     vaY = one_hot(vaY, 10)
     teY = one_hot(teY, 10)
 
-    return len(trX), len(vaX), len(teX), trX.astype('float32'),vaX.astype('float32'),teX.astype('float32'),trY.astype('float32'),vaY.astype('float32'),teY.astype('float32')
+    data = {}
+    data['P'] = len(trX)
+    data['n_x'] = int(trX.shape[1])
+    data['n_y'] = int(trY.shape[1])
+    data['shape_x'] = (28,28)
+
+    data['tr_X'] = trX.astype('float32'); 
+    data['va_X'] = vaX.astype('float32'); 
+    data['te_X'] = teX.astype('float32'); 
+    data['tr_Y'] = trY.astype('float32'); 
+    data['va_Y'] = vaY.astype('float32'); 
+    data['te_Y'] = teY.astype('float32');
+
+    return data
 
 def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 	if distort!=0:

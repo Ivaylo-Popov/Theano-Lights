@@ -13,31 +13,11 @@ if __name__ == "__main__":
     with hp:
         batch_size = 1000
         test_batch_size = 1000
-        train_perm = False
+        train_perm = True
 
         load_model = False
         save_model = True
-
         debug = False
-        resample_z = False
-
-        #Model = ffn.FFN
-        #Model = ffn_bn.FFN_bn
-        #Model = cnn.CNN
-        
-        #Model = vae1.Vae1
-        #Model = cvae.Cvae 
-        #Model = draw_at_lstm1.Draw_at_lstm1 
-        #Model = draw_at_lstm2.Draw_at_lstm2 
-        Model = draw_lstm1.Draw_lstm1 
-        #Model = draw_sgru1.Draw_sgru1 
-
-        init_scale = 1.05  
-        learning_rate = 0.0016 
-        lr_halflife = 50
-
-        ''' sgd(0.001),  rmsprop(0.001),  adam(0.0005),  adamgc(0.0005),  esgd(0.01) '''
-        optimizer = adamgc
 
         # ------------------
         walkforward = False
@@ -46,15 +26,39 @@ if __name__ == "__main__":
         n_stepdecay = 1.0
         ws_validstop = 0.02
 
+        # ------------------
+        #Model = ffn.FFN
+        #Model = ffn_bn.FFN_bn
+        #Model = ffn_ace.FFN_ace
+        #Model = ffn_lae.FFN_lae
+        #Model = ffn_vat.FFN_vat
+        Model = ffn_bn_vat.FFN_bn_vat
+
+        #Model = cnn.CNN
+        #Model = vae1.Vae1
+        #Model = cvae.Cvae
+        #Model = draw_at_lstm1.Draw_at_lstm1
+        #Model = draw_at_lstm2.Draw_at_lstm2
+        #Model = draw_lstm1.Draw_lstm1
+        #Model = draw_sgru1.Draw_sgru1
+
+        init_scale = 1.05  
+        learning_rate = 0.003
+        lr_halflife = 9.5
+
+        optimizer = adamgc
+
+        description = ''
 
 #   Data
 #--------------------------------------------------------------------------------------------------
     data_path = 'data/'
 
-    data = mnist(path=data_path+'mnist/', nvalidation=0) 
+    data = mnist(path=data_path+'mnist/', nvalidation=0)
+    #data = mnist2(path=data_path+'mnist/')
     #data = mnistBinarized(path=data_path+'mnist/')  # only for UL models
 
-    #data = mnist(path=data_path+'mnist/', distort=3, shuffle=True) 
+    #data = mnist(path=data_path+'mnist/', distort=3, shuffle=True)
     #data = freyfaces(path=data_path+'frey/')
 
     #data = downsample(data)
@@ -66,7 +70,7 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     model = Model(data, hp)
     
-    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  ws: %d  iter: %d" % (model.id, learning_rate, init_scale, batch_size, walkforward*walkstep_size, ws_iterations)) 
+    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  ws: %d  iter: %d  desc: %s" % (model.id, learning_rate, init_scale, batch_size, walkforward*walkstep_size, ws_iterations, description)) 
     
     if walkforward:
         # Walkforward learning

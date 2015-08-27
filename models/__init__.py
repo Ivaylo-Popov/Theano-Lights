@@ -1,7 +1,12 @@
 
 __all__ = [
     "ffn",
+    "rbfn",
     "ffn_bn",
+    "ffn_ace",
+    "ffn_lae",
+    "ffn_bn_vat",
+    "ffn_vat",
     "cnn", 
     "vae1",
     "cvae", 

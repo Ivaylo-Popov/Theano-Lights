@@ -21,7 +21,6 @@ if __name__ == "__main__":
         save_model = True
 
         debug = False
-        resample_z = False
         train_perm = False
         walkforward = False
         dynamic_eval = False

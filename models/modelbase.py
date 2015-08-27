@@ -112,7 +112,7 @@ class ModelSLBase(ModelBase):
                 data['tr_X'] = data['tr_X'][perm_idx]
                 data['tr_Y'] = data['tr_Y'][perm_idx]
 
-    def compile(self, cost, error_map_pyx, add_updates=[]):
+    def compile(self, cost, error_map_pyx, add_updates=[], debug_info=[]):
         batch_idx = T.iscalar()
         learning_rate = T.fscalar()
 
@@ -130,6 +130,10 @@ class ModelSLBase(ModelBase):
                                          self.Y:self.data['tr_Y'][batch_idx * self.hp.batch_size : 
                                                                   (batch_idx+1) * self.hp.batch_size]},
                                      outputs=outputs + [norm_grad])
+                                     #,mode=theano.compile.nanguardmode.NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+
+        #T.printing.debugprint(self.train)
+        #T.printing.pydotprint(self.train, outfile="logreg_pydotprint_train.png", var_with_name_simple=True)
         
         self.validate = theano.function(inputs=[batch_idx], 
                                         givens={
@@ -146,7 +150,7 @@ class ModelSLBase(ModelBase):
                                          self.Y:self.data['te_Y'][batch_idx * self.hp.test_batch_size : 
                                                                   (batch_idx+1) * self.hp.test_batch_size]},
                                     outputs=outputs)
-        
+
 # --------------------------------------------------------------------------------------------------
 
 class ModelULBase(ModelBase):
@@ -156,6 +160,8 @@ class ModelULBase(ModelBase):
         self.id = id
         self.filename = 'savedmodels\model_'+id+'.pkl'
         self.hp = hp
+
+        self.resample_z = False
 
         self.X = T.fmatrix('X')
         self.Z = T.fmatrix('Z')
@@ -211,7 +217,7 @@ class ModelULBase(ModelBase):
         
         n_samples = T.iscalar()
 
-        if self.hp.resample_z:
+        if self.resample_z:
             self.data['ge_Z'] = srnd.normal((self.max_gen_samples, self.n_z), dtype=theano.config.floatX)
         else:
             self.data['ge_Z'] = shared(np.random.randn(self.max_gen_samples, self.n_z))
