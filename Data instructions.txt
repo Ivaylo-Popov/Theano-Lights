@@ -1,6 +1,7 @@
 Obtain the following files and change data_path in train.py/train_lm.py to the desired location:
 
 MNIST
+Location : http://yann.lecun.com/exdb/mnist/
 --------------------------
 train-images.idx3-ubyte
 train-labels.idx1-ubyte
@@ -19,6 +20,9 @@ Frey Faces:
 freyfaces.pkl
 
 
+For language models tokenize the obtained raw text files with scripts/text_tokenizer.py
+
+
 Penn Treebank:
 --------------------------
 penntree.npz
@@ -26,3 +30,6 @@ penntree.npz
 text8:
 --------------------------
 text8.npz
+
+
+Contact me if you have difficulties obtaining and converting the data sets. 
