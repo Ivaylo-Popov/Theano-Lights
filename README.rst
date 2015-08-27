@@ -24,6 +24,7 @@ Stochastic gradient descent variants:
  * Rmsprop
  * Adam
  * Adam with gradient clipping
+ * Walk-forward learning for non-stationary data (data with concept drift)
 
 Supervised training on:
  * MNIST
