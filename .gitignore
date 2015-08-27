@@ -58,3 +58,4 @@ sample_text.txt
 scripts/penntree.npz
 scripts/penntree_orig.npz
 scripts/penntree_train
+models/ffn_bn_vat_lae.py
