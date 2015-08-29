@@ -3,7 +3,7 @@ Theano-Lights
 
 Theano-Lights is a research framework based on Theano providing implementation of several recent Deep learning models and a convenient training and test functionality. The models are not hidden and spread out behind layers of abstraction as in most deep learning platforms to enable transparency and flexiblity during learning and research. 
 
-## Included models:
+Included models:
  * Feedforward neural network (FFN)
  * Convolutional neural network (CNN)
  * Variational autoencoder  (VAE)
