@@ -1,6 +1,8 @@
-Obtain the following files and place them under folder data/'dataset name' or alternatively change data_path in train.py or train_lm.py to the desired location.
+Obtain the following files and place them under folder data/'dataset name' or 
 
-MNIST
+Alternatively, change data_path in train.py or train_lm.py to the desired location.
+
+MNIST (./mnist)
 Location : http://yann.lecun.com/exdb/mnist/
 --------------------------
 train-images.idx3-ubyte
@@ -9,25 +11,25 @@ t10k-images.idx3-ubyte
 t10k-labels.idx1-ubyte
 
 
-Binarized MNIST:
+Binarized MNIST (./mnist):
 --------------------------
 binarized_mnist-train.h5
 binarized_mnist-valid.h5
 binarized_mnist-test.h5
 
-Frey Faces:
+Frey Faces (./frey):
 --------------------------
 freyfaces.pkl
 
 
-For language models tokenize the obtained raw text files with scripts/text_tokenizer.py
+For language models: tokenize the obtained raw text files with scripts/text_tokenizer.py
+Penn Treebank is included in repository. 
 
-
-Penn Treebank:
+Penn Treebank (./penntree):
 --------------------------
 penntree.npz
 
-text8:
+text8 (./text8):
 --------------------------
 text8.npz
 
