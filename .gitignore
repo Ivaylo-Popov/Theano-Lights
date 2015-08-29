@@ -1,5 +1,8 @@
 *.pyc
-data
+archives
+finance
+mnist
+text8
 savedmodels
 *.suo
 samples_*
