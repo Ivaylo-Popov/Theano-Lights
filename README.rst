@@ -39,3 +39,8 @@ Other models and features:
  * Auto-classifier-encoder (Georgiev, 2015)
  * Radias basis function neural network
  * Denoising autoencoder with lateral connections
+
+Work in progress:
+ * Natural neural networks (Desjardins et al., 2015) 
+ * Ladder network (Rasmus et al., 2015)
+ * Virtual adversarial training for CNN and RNN
