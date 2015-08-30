@@ -6,6 +6,7 @@ Theano-Lights is a research framework based on Theano providing implementation o
 Included models:
  * Feedforward neural network (FFN)
  * Convolutional neural network (CNN)
+ * Recurrent neural networks (RNN)
  * Variational autoencoder  (VAE)
  * Convolutional Variational autoencoder (CVAE)
  * Deep Recurrent Attentive Writer (DRAW)
