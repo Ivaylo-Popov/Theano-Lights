@@ -441,23 +441,37 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 		fd = open(os.path.join(path,'train-images.idx3-ubyte_distorted'))
 	else:
 		ninst = 60000
-		fd = open(os.path.join(path,'train-images.idx3-ubyte'))
+		try:
+			fd = open(os.path.join(path,'train-images.idx3-ubyte'))
+		except:
+			fd = open(os.path.join(path,'train-images-idx3-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	trX = loaded[16:ninst*784+16].reshape((ninst,28*28)).astype(float)
 
 	if distort!=0:
 		fd = open(os.path.join(path,'train-labels.idx1-ubyte_distorted'))
 	else:
-		fd = open(os.path.join(path,'train-labels.idx1-ubyte'))
+		try:
+			fd = open(os.path.join(path,'train-labels.idx1-ubyte'))
+		except:
+			fd = open(os.path.join(path,'train-labels-idx1-ubyte'))
 	
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	trY = loaded[8:ninst+8].reshape((ninst))
 
-	fd = open(os.path.join(path,'t10k-images.idx3-ubyte'))
+	try:
+		fd = open(os.path.join(path,'t10k-images.idx3-ubyte'))
+	except:
+		fd = open(os.path.join(path,'t10k-images-idx3-ubyte'))
+
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teX = loaded[16:].reshape((10000,28*28)).astype(float)
 
-	fd = open(os.path.join(path,'t10k-labels.idx1-ubyte'))
+	try:
+		fd = open(os.path.join(path,'t10k-labels.idx1-ubyte'))
+	except:
+		fd = open(os.path.join(path,'t10k-labels-idx1-ubyte'))
+
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teY = loaded[8:].reshape((10000))
 

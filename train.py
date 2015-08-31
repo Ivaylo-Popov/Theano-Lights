@@ -11,8 +11,8 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     hp = Parameters()
     with hp:
-        batch_size = 1000
-        test_batch_size = 1000
+        batch_size = 500
+        test_batch_size = 500
         train_perm = True
 
         load_model = False
@@ -70,7 +70,8 @@ if __name__ == "__main__":
 #--------------------------------------------------------------------------------------------------
     model = Model(data, hp)
     
-    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  ws: %d  iter: %d  desc: %s" % (model.id, learning_rate, init_scale, batch_size, walkforward*walkstep_size, ws_iterations, description)) 
+    print ("M: %s  lr: %.5f  init: %.2f  batch: %d  ws: %d  iter: %d  desc: %s" % 
+           (model.id, learning_rate, init_scale, batch_size, walkforward*walkstep_size, ws_iterations, description)) 
     
     if walkforward:
         # Walkforward learning
