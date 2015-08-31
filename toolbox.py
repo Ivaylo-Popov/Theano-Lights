@@ -1,5 +1,8 @@
 import os
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
 from PIL import Image
 from subprocess import Popen
 import numpy as np
@@ -360,7 +363,7 @@ def downsample(data):
 
 def freyfaces(path='', distort=False,shuffle=False,ntrain=60000,ntest=10000,onehot=True):
     f = open(os.path.join(path,'freyfaces.pkl'),'rb')
-    data = cPickle.load(f)
+    data = pickle.load(f)
     f.close()
 
     lenX = len(data) * 0.9
@@ -438,26 +441,26 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 	if distort!=0:
 		ninst = 60000*(1 + distort)
 		ntrain = ninst
-		fd = open(os.path.join(path,'train-images.idx3-ubyte_distorted'))
+		fd = open(os.path.join(path,'train-images-idx3-ubyte_distorted'))
 	else:
 		ninst = 60000
-		fd = open(os.path.join(path,'train-images.idx3-ubyte'))
+		fd = open(os.path.join(path,'train-images-idx3-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	trX = loaded[16:ninst*784+16].reshape((ninst,28*28)).astype(float)
 
 	if distort!=0:
-		fd = open(os.path.join(path,'train-labels.idx1-ubyte_distorted'))
+		fd = open(os.path.join(path,'train-labels-idx1-ubyte_distorted'))
 	else:
-		fd = open(os.path.join(path,'train-labels.idx1-ubyte'))
+		fd = open(os.path.join(path,'train-labels-idx1-ubyte'))
 	
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	trY = loaded[8:ninst+8].reshape((ninst))
 
-	fd = open(os.path.join(path,'t10k-images.idx3-ubyte'))
+	fd = open(os.path.join(path,'t10k-images-idx3-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teX = loaded[16:].reshape((10000,28*28)).astype(float)
 
-	fd = open(os.path.join(path,'t10k-labels.idx1-ubyte'))
+	fd = open(os.path.join(path,'t10k-labels-idx1-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teY = loaded[8:].reshape((10000))
 
@@ -477,8 +480,8 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 		for i in range(ntrain):
 			trX[i] = trX_n[idx[i]]
 			trY[i] = trY_n[idx[i]]
-        trX_n = None
-        trY_n = None
+		trX_n = None
+		trY_n = None
 
 	trY = one_hot(trY, 10)
 	vaY = one_hot(vaY, 10)
