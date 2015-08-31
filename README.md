@@ -49,7 +49,7 @@ You can find instructions on how to obtain and prepare the datasets [here](https
  * Radias basis function neural network
  * Denoising autoencoder with lateral connections
 
-#### Works in progress:
+#### Work in progress:
  * Natural neural networks (Desjardins et al., 2015) 
  * Ladder network (Rasmus et al., 2015)
  * Virtual adversarial training for CNN and RNN
