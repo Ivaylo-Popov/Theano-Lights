@@ -10,7 +10,6 @@ import scipy.io
 import time
 import sys
 import logging
-import cPickle as pickle
 import copy
 from operator import add
 
