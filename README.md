@@ -9,6 +9,8 @@ pip install -r requirements.txt
 python train.py
 ```
 
+You can find instructions on how to obtain and prepare the datasets [here](https://github.com/Ivaylo-Popov/Theano-Lights/blob/master/Data%20instructions.txt). 
+
 #### Included models:
  * Feedforward neural network (FFN)
  * Convolutional neural network (CNN)

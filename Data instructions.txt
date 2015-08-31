@@ -3,7 +3,7 @@ Obtain the following files and place them under folder data/'dataset name' or
 Alternatively, change data_path in train.py or train_lm.py to the desired location.
 
 MNIST (./mnist)
-Location : http://yann.lecun.com/exdb/mnist/
+Use the provided get_mnist.py tool or download from: http://yann.lecun.com/exdb/mnist/
 --------------------------
 train-images.idx3-ubyte
 train-labels.idx1-ubyte
