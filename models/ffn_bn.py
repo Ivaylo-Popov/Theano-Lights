@@ -26,32 +26,27 @@ class FFN_bn(ModelSLBase):
     def __init__(self, data, hp):
         super(FFN_bn, self).__init__(self.__class__.__name__, data, hp)
         
-        self.epsilon = 0.0001
-
         self.params = Parameters()
         self.shared_vars = Parameters()
-        n_x = self.data['n_x']
-        n_y = self.data['n_y']
         n_h1 = 1200
         n_h2 = 1000
         n_h3 = 800
         n_h4 = 800
-        scale = hp.init_scale
 
         if hp.load_model and os.path.isfile(self.filename):
             self.params.load(self.filename)
             self.shared_vars.load(self.filename + '_vars')
         else:
             with self.params:
-                w_h = shared_normal((n_x, n_h1), scale=scale)
+                w_h = shared_normal((self.data['n_x'], n_h1), scale=hp.init_scale)
                 b_h = shared_zeros((n_h1,))
-                w_h2 = shared_normal((n_h1, n_h2), scale=scale)
+                w_h2 = shared_normal((n_h1, n_h2), scale=hp.init_scale)
                 b_h2 = shared_zeros((n_h2,))
-                w_h3 = shared_normal((n_h2, n_h3), scale=scale)
+                w_h3 = shared_normal((n_h2, n_h3), scale=hp.init_scale)
                 b_h3 = shared_zeros((n_h3,))
-                w_h4 = shared_normal((n_h3, n_h4), scale=scale)
+                w_h4 = shared_normal((n_h3, n_h4), scale=hp.init_scale)
                 b_h4 = shared_zeros((n_h4,))
-                w_o = shared_normal((n_h4, n_y), scale=scale)
+                w_o = shared_normal((n_h4, self.data['n_y']), scale=hp.init_scale)
 
             with self.shared_vars:
                 m_shared = shared_zeros((1, n_h1), broadcastable=(True, False))
@@ -63,14 +58,14 @@ class FFN_bn(ModelSLBase):
                 m_shared4 = shared_zeros((1, n_h4), broadcastable=(True, False))
                 v_shared4 = shared_zeros((1, n_h4), broadcastable=(True, False))
         
-        def batch_norm(X, m_shared, v_shared, test, add_updates):
+        def batch_norm(X, m_shared, v_shared, test, add_updates, epsilon = 0.0001):
             if X.ndim > 2:
                 output_shape = X.shape
                 X = X.flatten(2)
  
             if test is False:
                 m = T.mean(X, axis=0, keepdims=True)
-                v = T.sqrt(T.var(X, axis=0, keepdims=True) + self.epsilon)
+                v = T.sqrt(T.var(X, axis=0, keepdims=True) + epsilon)
                 
                 mulfac = 1.0/100.0
                 add_updates.append((m_shared, (1.0-mulfac)*m_shared + mulfac*m))
@@ -103,7 +98,10 @@ class FFN_bn(ModelSLBase):
         
         add_updates = []
 
-        noise_py_x = model(self.X + gaussian(self.X.shape, 0.2), self.params, self.shared_vars, 0.5, False, add_updates)
+        input_noise = 5.0
+
+        noise_X = self.X + input_noise*normalize(gaussian(self.X.shape, 1.0))
+        noise_py_x = model(noise_X, self.params, self.shared_vars, 0.5, False, add_updates)
         cost_y2 = -T.sum(self.Y * T.log(noise_py_x))
         
         #clean_py_x = model(self.X, self.params, self.shared_vars, 0.0, 0.5, True, None)
