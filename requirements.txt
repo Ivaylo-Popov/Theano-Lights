@@ -4,6 +4,6 @@
 #  See http://deeplearning.net/software/theano/install.html#requirements
 
 Theano
-Pillow
+PIL
 h5py
 scikit-image
