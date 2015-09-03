@@ -475,11 +475,6 @@ def mnist(path='', distort=0,shuffle=False,nvalidation=10000):
 	except:
 		fd = open(os.path.join(path,'t10k-labels-idx1-ubyte'))
 
-	fd = open(os.path.join(path,'t10k-images-idx3-ubyte'))
-	loaded = np.fromfile(file=fd,dtype=np.uint8)
-	teX = loaded[16:].reshape((10000,28*28)).astype(float)
-
-	fd = open(os.path.join(path,'t10k-labels-idx1-ubyte'))
 	loaded = np.fromfile(file=fd,dtype=np.uint8)
 	teY = loaded[8:].reshape((10000))
 
