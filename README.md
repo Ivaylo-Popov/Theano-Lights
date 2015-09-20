@@ -54,3 +54,4 @@ You can find instructions on how to obtain and prepare the datasets [here](https
  * Ladder network (Rasmus et al., 2015)
  * Virtual adversarial training for CNN and RNN
 
+[![Sampling a generative MNIST model](https://i.ytimg.com/vi/XGUrvMAVv5g/1.jpg?time=1442746941246)](https://youtu.be/XGUrvMAVv5g)
